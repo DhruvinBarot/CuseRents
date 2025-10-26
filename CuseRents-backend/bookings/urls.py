@@ -1,6 +1,14 @@
-from django.urls import path
+# bookings/urls.py
+
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
 
-app_name = 'bookings'  # Change this name for each app
+app_name = 'bookings'
 
-urlpatterns = []
+router = DefaultRouter()
+router.register(r'bookings', views.BookingViewSet, basename='booking')
+
+urlpatterns = [
+    path('', include(router.urls)),
+]

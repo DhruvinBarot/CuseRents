@@ -12,7 +12,7 @@ import math
 
 class ItemViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for items with map search functionality
+    ViewSet for items with map search functionality and CRUD operations
     """
     permission_classes = [IsAuthenticatedOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -30,6 +30,31 @@ class ItemViewSet(viewsets.ModelViewSet):
         elif self.action in ['create', 'update', 'partial_update']:
             return ItemCreateUpdateSerializer
         return ItemDetailSerializer
+    
+    def get_permissions(self):
+        """Set permissions based on action"""
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAuthenticated()]
+        return [AllowAny()]
+    
+    def perform_create(self, serializer):
+        """Set owner to current user when creating item"""
+        serializer.save(owner=self.request.user)
+    
+    def perform_update(self, serializer):
+        """Only allow owner to update their items"""
+        item = self.get_object()
+        if item.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You can only update your own items")
+        serializer.save()
+    
+    def perform_destroy(self, instance):
+        """Only allow owner to delete their items"""
+        if instance.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You can only delete your own items")
+        instance.delete()
     
     @action(detail=False, methods=['get'], url_path='search')
     def search(self, request):

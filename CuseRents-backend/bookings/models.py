@@ -168,15 +168,21 @@ class Booking(models.Model):
         return None
     
     @property
+    @property
     def duration_hours(self):
         """Calculate booking duration in hours"""
-        delta = self.end_time - self.start_time
-        return delta.total_seconds() / 3600
+        if self.end_time and self.start_time:
+            delta = self.end_time - self.start_time
+            return delta.total_seconds() / 3600
+        return 0
     
+    @property
     @property
     def is_overdue(self):
         """Check if booking is past end_time and not returned"""
         from django.utils import timezone
+        if not self.end_time:
+            return False
         return (
             self.status == 'active' and
             timezone.now() > self.end_time and
