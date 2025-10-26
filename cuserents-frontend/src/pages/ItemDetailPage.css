@@ -1,0 +1,136 @@
+.item-detail-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.item-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+
+.item-images img {
+  width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.item-info h1 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.item-description {
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 30px;
+}
+
+.pricing-info {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 30px;
+}
+
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.price {
+  font-weight: 600;
+  color: #4CAF50;
+  font-size: 18px;
+}
+
+.booking-section {
+  background: white;
+  border: 2px solid #e0e0e0;
+  padding: 25px;
+  border-radius: 12px;
+}
+
+.booking-section h3 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.date-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.date-field label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #555;
+}
+
+.date-field input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.rental-summary {
+  background: #f0f7ff;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 15px;
+}
+
+.summary-row.total {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 2px solid #ddd;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.book-now-btn {
+  width: 100%;
+  padding: 16px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.book-now-btn:hover:not(:disabled) {
+  background: #45a049;
+}
+
+.book-now-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .item-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .date-inputs {
+    grid-template-columns: 1fr;
+  }
+}

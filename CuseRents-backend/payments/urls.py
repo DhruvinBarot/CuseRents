@@ -1,6 +1,6 @@
 from django.urls import path
-from . import views
+from .views import CreatePaymentIntentView
 
-app_name = 'payments'  # Change this name for each app
-
-urlpatterns = []
+urlpatterns = [
+    path('create-payment-intent/', CreatePaymentIntentView.as_view()),
+]
