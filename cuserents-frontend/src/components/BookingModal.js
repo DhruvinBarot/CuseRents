@@ -6,7 +6,6 @@ const BookingModal = ({ item, onClose, onSuccess }) => {
   const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
   const [endTime, setEndTime] = useState('');
-  const [useWallet, setUseWallet] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [bookingCode, setBookingCode] = useState(null);
@@ -14,7 +13,7 @@ const BookingModal = ({ item, onClose, onSuccess }) => {
   // Calculate pricing
   const calculatePrice = () => {
     if (!startDate || !startTime || !endDate || !endTime) {
-      return { hours: 0, total: 0, deposit: 0 };
+      return { hours: 0, total: 0, deposit: 0, grandTotal: 0 };
     }
 
     const start = new Date(`${startDate}T${startTime}`);
@@ -57,18 +56,45 @@ const BookingModal = ({ item, onClose, onSuccess }) => {
         item_id: item.id,
         start_time: new Date(`${startDate}T${startTime}`).toISOString(),
         end_time: new Date(`${endDate}T${endTime}`).toISOString(),
-        wallet_credit_used: useWallet ? 0 : 0 // TODO: implement wallet deduction
+        wallet_credit_used: 0
       };
 
+      console.log('Creating booking with data:', bookingData);
       const result = await createBooking(bookingData);
-      setBookingCode(result.booking_code);
+      console.log('Full booking response:', result);
       
-      if (onSuccess) onSuccess();
+      // Extract booking code - try all possible paths
+      let code = null;
+      
+      if (result.booking_code) {
+        code = result.booking_code;
+      } else if (result.booking && result.booking.booking_code) {
+        code = result.booking.booking_code;
+      } else if (result.data && result.data.booking_code) {
+        code = result.data.booking_code;
+      }
+      
+      console.log('Extracted booking code:', code);
+      
+      // Set booking code to show success view
+      if (code) {
+        setBookingCode(code);
+        console.log('Success! Setting booking code:', code);
+      } else {
+        console.warn('No booking code found in response:', result);
+        // Fallback: show alert and close
+        alert(`Booking created successfully! Check your Profile to see it.`);
+        if (onSuccess) onSuccess();
+        onClose();
+      }
 
     } catch (err) {
-      console.error('Error creating booking:', err);
+      console.error('Booking creation error:', err);
+      console.error('Error response:', err.response?.data);
+      
       const errorMsg = err.response?.data?.detail || 
                       err.response?.data?.non_field_errors?.[0] ||
+                      err.response?.data?.error ||
                       'Failed to create booking. Please try again.';
       setError(errorMsg);
     } finally {
@@ -76,7 +102,7 @@ const BookingModal = ({ item, onClose, onSuccess }) => {
     }
   };
 
-  // Success view
+  // Success view with booking code
   if (bookingCode) {
     return (
       <div className="modal-overlay" onClick={onClose}>
@@ -91,7 +117,7 @@ const BookingModal = ({ item, onClose, onSuccess }) => {
             <p>Your booking code:</p>
             <div className="booking-code-display">{bookingCode}</div>
             <p className="booking-note">
-              The owner will review your request. You'll be notified once approved!
+              The owner will review your request. Check your Profile for updates!
             </p>
             <button className="cta-button" onClick={onClose}>
               Got it!
@@ -102,7 +128,7 @@ const BookingModal = ({ item, onClose, onSuccess }) => {
     );
   }
 
-  // Booking form
+  // Booking form view
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>

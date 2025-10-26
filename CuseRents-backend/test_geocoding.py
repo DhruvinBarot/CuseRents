@@ -31,7 +31,7 @@ else:
 
 # Test 2: Coordinates to Address
 print("\n2. Testing coords_to_address():")
-lat, lng = 43.0389, -76.1351
+lat, lng = 43.0481, -76.1474
 print(f"   Coords: ({lat}, {lng})")
 address = geocoding_service.coords_to_address(lat, lng)
 if address:

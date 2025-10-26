@@ -79,7 +79,7 @@ class ItemViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        radius = float(request.query_params.get('radius', 5))  # Default 5km
+        radius = float(request.query_params.get('radius', 50))  # Default 5km
         category = request.query_params.get('category')
         min_price = request.query_params.get('min_price')
         max_price = request.query_params.get('max_price')

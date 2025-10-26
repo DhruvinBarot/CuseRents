@@ -31,6 +31,18 @@ class BookingViewSet(viewsets.ModelViewSet):
             return BookingDetailSerializer
         return BookingListSerializer
     
+    def create(self, request, *args, **kwargs):
+        """Create booking and return booking code prominently"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        booking = serializer.save()
+        
+        return Response({
+            'booking_code': booking.booking_code,
+            'message': 'Booking request created successfully',
+            'booking': BookingDetailSerializer(booking).data
+        }, status=status.HTTP_201_CREATED)
+    
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
         """Owner accepts booking request"""
