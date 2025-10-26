@@ -7,12 +7,8 @@ import EditItemModal from './components/EditItemModal';
 import { 
   Home, Search, PlusCircle, User, MapPin, 
   DollarSign, Package, Wrench, Camera, 
-
-  UtensilsCrossed, PartyPopper, Laptop, Book,
+  UtensilsCrossed, PartyPopper, Laptop, Book, LogOut,
   ArrowLeft, Calendar
-
-  UtensilsCrossed, PartyPopper, Laptop, Book, LogOut 
-
 } from 'lucide-react';
 import './App.css';
 
@@ -25,7 +21,6 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-
   const [selectedItem, setSelectedItem] = useState(null);
   const [bookingData, setBookingData] = useState(null);
 
@@ -33,7 +28,6 @@ function App() {
   
   // Auth context
   const { user, isAuthenticated, logout } = useAuth();
-
 
   // Categories configuration
   const categories = [
@@ -83,6 +77,12 @@ function App() {
     });
   }, [items, searchQuery]);
 
+  // Handle logout
+  const handleLogout = () => {
+    logout();
+    setCurrentView('home');
+  };
+  
 
   const handleViewDetails = (item) => {
     setSelectedItem(item);
@@ -99,15 +99,7 @@ function App() {
     setCurrentView('bookingConfirmed');
   };
 
-
-  // Handle logout
-  const handleLogout = () => {
-    logout();
-    setCurrentView('home');
-  };
-
   // ==================== HOME VIEW ====================
-
   const HomeView = () => (
     <div className="home-view">
       {/* Hero Section */}
@@ -192,121 +184,372 @@ function App() {
 
   // ==================== BROWSE VIEW ====================
   const BrowseView = () => {
-    const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedItemForBooking, setSelectedItemForBooking] = useState(null);
 
-    const handleBookItem = (item) => {
-      if (!isAuthenticated) {
-        setShowAuthModal(true);
-        return;
-      }
-      setSelectedItem(item);
+  const handleBookItem = (item) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    setSelectedItemForBooking(item);
+  };
+
+  const handleBookingSuccess = () => {
+    setSelectedItemForBooking(null);
+  };
+
+  return (
+    <div className="browse-view">
+      <div className="search-bar">
+        <Search size={20} className="search-icon" />
+        <input
+          type="text"
+          placeholder="Search for drills, cameras, tools..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="search-input"
+          autoComplete="off"
+        />
+      </div>
+
+      <div className="category-filter">
+        <button
+          className={`filter-chip ${!selectedCategory ? 'active' : ''}`}
+          onClick={() => setSelectedCategory('')}
+        >
+          All
+        </button>
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            className={`filter-chip ${selectedCategory === cat.id ? 'active' : ''}`}
+            onClick={() => setSelectedCategory(cat.id)}
+          >
+            {cat.name}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="loading">
+          <div className="spinner"></div>
+          <p>Finding items near you...</p>
+        </div>
+      ) : (
+        <>
+          <div className="results-header">
+            Found {filteredItems.length} items near Syracuse University
+          </div>
+
+          <div className="items-grid">
+            {filteredItems.map((item) => {
+              const CategoryIcon = categories.find(c => c.id === item.category)?.icon || Package;
+              return (
+                <div key={item.id} className="item-tile">
+                  <div className="item-icon-wrapper">
+                    <CategoryIcon size={48} color="#F76900" />
+                  </div>
+                  <div className="item-info">
+                    <h3 className="item-name">{item.title}</h3>
+                    <p className="item-desc">{item.description}</p>
+                    <div className="item-details">
+                      <div className="item-price">
+                        <DollarSign size={16} />
+                        <span className="price">{parseFloat(item.price_per_hour).toFixed(2)}</span>
+                        <span className="unit">/hr</span>
+                      </div>
+                      <div className="item-distance">
+                        <MapPin size={16} />
+                        <span>{item.distance_km || '0.5'}km</span>
+                      </div>
+                    </div>
+                    <button 
+                      className="rent-button"
+                      onClick={() => handleViewDetails(item)}
+                    >
+                      View Details
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {selectedItemForBooking && (
+        <BookingModal
+          item={selectedItemForBooking}
+          onClose={() => setSelectedItemForBooking(null)}
+          onSuccess={handleBookingSuccess}
+        />
+      )}
+    </div>
+  );
+};
+
+  const ItemDetailView = () => {
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [hours, setHours] = useState(1);
+
+    if (!selectedItem) return null;
+
+    const CategoryIcon = categories.find(c => c.id === selectedItem.category)?.icon || Package;
+
+    const calculateTotal = () => {
+      return (parseFloat(selectedItem.price_per_hour) * hours);
     };
 
-    const handleBookingSuccess = () => {
-      setSelectedItem(null);
-      // Optionally show success message or redirect to profile
+    const depositAmount = parseFloat(selectedItem.deposit || 50);
+
+    const handleBooking = () => {
+      if (!startDate || !hours) {
+        alert('Please select rental date and duration');
+        return;
+      }
+
+      handleProceedToCheckout({
+        item: selectedItem,
+        startDate,
+        hours,
+        rentalFee: parseFloat(calculateTotal()),
+        depositAmount: depositAmount
+      });
     };
 
     return (
-      <div className="browse-view">
-        <div className="search-bar">
-          <Search size={20} className="search-icon" />
-          <input
-            type="text"
-            placeholder="Search for drills, cameras, tools..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="search-input"
-            autoComplete="off"
-          />
-        </div>
+      <div className="item-detail-view">
+        <button className="back-button" onClick={() => setCurrentView('browse')}>
+          <ArrowLeft size={20} />
+          Back to Browse
+        </button>
 
-        <div className="category-filter">
-          <button
-            className={`filter-chip ${!selectedCategory ? 'active' : ''}`}
-            onClick={() => setSelectedCategory('')}
-          >
-            All
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              className={`filter-chip ${selectedCategory === cat.id ? 'active' : ''}`}
-              onClick={() => setSelectedCategory(cat.id)}
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="loading">
-            <div className="spinner"></div>
-            <p>Finding items near you...</p>
+        <div className="detail-container">
+          <div className="detail-header">
+            <div className="detail-icon-wrapper">
+              <CategoryIcon size={80} color="#F76900" />
+            </div>
+            <div className="detail-header-info">
+              <h1>{selectedItem.title}</h1>
+              <p className="detail-category">{selectedItem.category}</p>
+              <div className="detail-location">
+                <MapPin size={16} />
+                <span>{selectedItem.distance_km || '0.5'}km away</span>
+              </div>
+            </div>
           </div>
-        ) : (
-          <>
-            <div className="results-header">
-              Found {filteredItems.length} items near Syracuse University
+
+          <div className="detail-body">
+            <div className="detail-description">
+              <h3>Description</h3>
+              <p>{selectedItem.description}</p>
             </div>
 
-            <div className="items-grid">
-              {filteredItems.map((item) => {
-                const CategoryIcon = categories.find(c => c.id === item.category)?.icon || Package;
-                const isOwnItem = item.owner?.username === user?.username;
-                
-                return (
-                  <div key={item.id} className="item-tile">
-                    <div className="item-icon-wrapper">
-                      <CategoryIcon size={48} color="#F76900" />
-                    </div>
-                    <div className="item-info">
-                      <h3 className="item-name">{item.title}</h3>
-                      <p className="item-desc">{item.description}</p>
-                      <div className="item-details">
-                        <div className="item-price">
-                          <DollarSign size={16} />
-                          <span className="price">{parseFloat(item.price_per_hour).toFixed(2)}</span>
-                          <span className="unit">/hr</span>
-                        </div>
-                        <div className="item-distance">
-                          <MapPin size={16} />
-                          <span>{item.distance_km || '0.5'}km</span>
-                        </div>
-                      </div>
-                      <div className="item-owner-info">
-                        <span>by {item.owner?.username || 'Unknown'}</span>
-                      </div>
-                      {isOwnItem ? (
-                        <button className="rent-button" disabled style={{opacity: 0.6}}>
-                          Your Item
-                        </button>
-                      ) : (
-                        <button 
-                          className="rent-button"
-                          onClick={() => handleBookItem(item)}
-                        >
-                          📅 Book Now
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="pricing-card">
+              <h3>Pricing</h3>
+              <div className="price-row">
+                <span>Hourly Rate:</span>
+                <span className="price-value">${parseFloat(selectedItem.price_per_hour).toFixed(2)}/hr</span>
+              </div>
+              <div className="price-row">
+                <span>Security Deposit:</span>
+                <span className="price-value">${depositAmount}</span>
+              </div>
             </div>
-          </>
-        )}
 
-        {selectedItem && (
-          <BookingModal
-            item={selectedItem}
-            onClose={() => setSelectedItem(null)}
-            onSuccess={handleBookingSuccess}
-          />
-        )}
+            <div className="booking-card">
+              <h3>Book This Item</h3>
+              
+              <div className="form-group">
+                <label>
+                  <Calendar size={16} />
+                  Rental Start Date
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Duration (hours)</label>
+                <input
+                  type="number"
+                  value={hours}
+                  onChange={(e) => setHours(parseInt(e.target.value) || 1)}
+                  min="1"
+                  className="form-input"
+                />
+              </div>
+
+              {hours > 0 && (
+        <div className="booking-summary">
+    <div className="summary-row">
+      <span>Rental Fee ({hours} hrs):</span>
+      <span>${calculateTotal().toFixed(2)}</span>
+    </div>
+    <div className="summary-row">
+      <span>Deposit (hold):</span>
+      <span>${depositAmount.toFixed(2)}</span>
+    </div>
+    <div className="summary-row total">
+      <span>Total Authorization:</span>
+      <span>${(calculateTotal() + depositAmount).toFixed(2)}</span>
+    </div>
+  </div>
+              )}
+
+              <button className="book-button" onClick={handleBooking}>
+                Proceed to Payment
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
+
+  const CheckoutView = () => {
+    if (!bookingData) {
+      setCurrentView('browse');
+      return null;
+    }
+
+    const { item, startDate, hours, rentalFee, depositAmount } = bookingData;
+    const CategoryIcon = categories.find(c => c.id === item.category)?.icon || Package;
+
+    return (
+      <div className="checkout-view">
+        <button className="back-button" onClick={() => setCurrentView('itemDetail')}>
+          <ArrowLeft size={20} />
+          Back
+        </button>
+
+        <h1 className="page-title">Complete Your Booking</h1>
+
+        <div className="checkout-container">
+          <div className="order-summary-card">
+            <h2>Order Summary</h2>
+            
+            <div className="summary-item-preview">
+              <div className="summary-icon">
+                <CategoryIcon size={40} color="#F76900" />
+              </div>
+              <div>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
+              </div>
+            </div>
+
+            <div className="summary-details">
+              <div className="summary-detail-row">
+                <span>Start Date:</span>
+                <span>{startDate}</span>
+              </div>
+              <div className="summary-detail-row">
+                <span>Duration:</span>
+                <span>{hours} hours</span>
+              </div>
+              <div className="summary-detail-row">
+                <span>Hourly Rate:</span>
+                <span>${parseFloat(item.price_per_hour).toFixed(2)}/hr</span>
+              </div>
+            </div>
+
+            <div className="summary-pricing">
+              <div className="summary-price-row">
+                <span>Rental Fee:</span>
+                <span>${rentalFee.toFixed(2)}</span>
+              </div>
+              <div className="summary-price-row deposit">
+                <span>Security Deposit (hold):</span>
+                <span>${depositAmount}</span>
+              </div>
+              <div className="summary-price-row total">
+                <span>Total Authorization:</span>
+                <span>${(rentalFee + depositAmount).toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="deposit-notice">
+              💳 The security deposit will be held on your card but not charged. 
+              It will be released after you return the item in good condition.
+            </div>
+          </div>
+
+          <div className="payment-card">
+            <h2>Payment Details</h2>
+          <PaymentForm
+            rentalAmount={rentalFee}
+            depositAmount={depositAmount}
+            bookingId={null}
+            onSuccess={handlePaymentSuccess}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const BookingConfirmedView = () => (
+    <div className="confirmation-view">
+      <div className="confirmation-card">
+        <div className="success-icon">✓</div>
+        <h1>Booking Confirmed!</h1>
+        <p className="confirmation-message">
+          Your rental has been successfully booked and payment processed.
+        </p>
+
+        {bookingData && (
+          <div className="confirmation-details">
+            <h3>Booking Details</h3>
+            <div className="confirmation-row">
+              <span>Item:</span>
+              <span>{bookingData.item.title}</span>
+            </div>
+            <div className="confirmation-row">
+              <span>Start Date:</span>
+              <span>{bookingData.startDate}</span>
+            </div>
+            <div className="confirmation-row">
+              <span>Duration:</span>
+              <span>{bookingData.hours} hours</span>
+            </div>
+            <div className="confirmation-row">
+              <span>Rental Fee Paid:</span>
+              <span>${bookingData.rentalFee.toFixed(2)}</span>
+            </div>
+            <div className="confirmation-row">
+              <span>Deposit Authorized:</span>
+              <span>${bookingData.depositAmount}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="next-steps-card">
+          <h3>What's Next?</h3>
+          <ul>
+            <li>You'll receive a confirmation email shortly</li>
+            <li>The item owner will contact you for pickup details</li>
+            <li>Your security deposit will be released after return</li>
+          </ul>
+        </div>
+
+        <div className="confirmation-actions">
+          <button className="primary-button" onClick={() => setCurrentView('profile')}>
+            View My Rentals
+          </button>
+          <button className="secondary-button" onClick={() => setCurrentView('browse')}>
+            Browse More Items
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   // ==================== LIST ITEM VIEW ====================
   const ListItemView = () => {
@@ -748,295 +991,6 @@ function App() {
                         </span>
                       </div>
                     </div>
-
-                    <button 
-                      className="rent-button"
-                      onClick={() => handleViewDetails(item)}
-                    >
-                      View Details
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-
-  const ItemDetailView = () => {
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
-    const [hours, setHours] = useState(1);
-
-    if (!selectedItem) return null;
-
-    const CategoryIcon = categories.find(c => c.id === selectedItem.category)?.icon || Package;
-
-    const calculateTotal = () => {
-      return (parseFloat(selectedItem.price_per_hour) * hours);
-    };
-
-    const depositAmount = parseFloat(selectedItem.deposit || 50);
-
-    const handleBooking = () => {
-      if (!startDate || !hours) {
-        alert('Please select rental date and duration');
-        return;
-      }
-
-      handleProceedToCheckout({
-        item: selectedItem,
-        startDate,
-        hours,
-        rentalFee: parseFloat(calculateTotal()),
-        depositAmount: depositAmount
-      });
-    };
-
-    return (
-      <div className="item-detail-view">
-        <button className="back-button" onClick={() => setCurrentView('browse')}>
-          <ArrowLeft size={20} />
-          Back to Browse
-        </button>
-
-        <div className="detail-container">
-          <div className="detail-header">
-            <div className="detail-icon-wrapper">
-              <CategoryIcon size={80} color="#F76900" />
-            </div>
-            <div className="detail-header-info">
-              <h1>{selectedItem.title}</h1>
-              <p className="detail-category">{selectedItem.category}</p>
-              <div className="detail-location">
-                <MapPin size={16} />
-                <span>{selectedItem.distance_km || '0.5'}km away</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="detail-body">
-            <div className="detail-description">
-              <h3>Description</h3>
-              <p>{selectedItem.description}</p>
-            </div>
-
-            <div className="pricing-card">
-              <h3>Pricing</h3>
-              <div className="price-row">
-                <span>Hourly Rate:</span>
-                <span className="price-value">${parseFloat(selectedItem.price_per_hour).toFixed(2)}/hr</span>
-              </div>
-              <div className="price-row">
-                <span>Security Deposit:</span>
-                <span className="price-value">${depositAmount}</span>
-              </div>
-            </div>
-
-            <div className="booking-card">
-              <h3>Book This Item</h3>
-              
-              <div className="form-group">
-                <label>
-                  <Calendar size={16} />
-                  Rental Start Date
-                </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="form-input"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Duration (hours)</label>
-                <input
-                  type="number"
-                  value={hours}
-                  onChange={(e) => setHours(parseInt(e.target.value) || 1)}
-                  min="1"
-                  className="form-input"
-                />
-              </div>
-
-              {hours > 0 && (
-        <div className="booking-summary">
-    <div className="summary-row">
-      <span>Rental Fee ({hours} hrs):</span>
-      <span>${calculateTotal().toFixed(2)}</span>
-    </div>
-    <div className="summary-row">
-      <span>Deposit (hold):</span>
-      <span>${depositAmount.toFixed(2)}</span>
-    </div>
-    <div className="summary-row total">
-      <span>Total Authorization:</span>
-      <span>${(calculateTotal() + depositAmount).toFixed(2)}</span>
-    </div>
-  </div>
-              )}
-
-              <button className="book-button" onClick={handleBooking}>
-                Proceed to Payment
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const CheckoutView = () => {
-    if (!bookingData) {
-      setCurrentView('browse');
-      return null;
-    }
-
-    const { item, startDate, hours, rentalFee, depositAmount } = bookingData;
-    const CategoryIcon = categories.find(c => c.id === item.category)?.icon || Package;
-
-    return (
-      <div className="checkout-view">
-        <button className="back-button" onClick={() => setCurrentView('itemDetail')}>
-          <ArrowLeft size={20} />
-          Back
-        </button>
-
-        <h1 className="page-title">Complete Your Booking</h1>
-
-        <div className="checkout-container">
-          <div className="order-summary-card">
-            <h2>Order Summary</h2>
-            
-            <div className="summary-item-preview">
-              <div className="summary-icon">
-                <CategoryIcon size={40} color="#F76900" />
-              </div>
-              <div>
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
-              </div>
-            </div>
-
-            <div className="summary-details">
-              <div className="summary-detail-row">
-                <span>Start Date:</span>
-                <span>{startDate}</span>
-              </div>
-              <div className="summary-detail-row">
-                <span>Duration:</span>
-                <span>{hours} hours</span>
-              </div>
-              <div className="summary-detail-row">
-                <span>Hourly Rate:</span>
-                <span>${parseFloat(item.price_per_hour).toFixed(2)}/hr</span>
-              </div>
-            </div>
-
-            <div className="summary-pricing">
-              <div className="summary-price-row">
-                <span>Rental Fee:</span>
-                <span>${rentalFee.toFixed(2)}</span>
-              </div>
-              <div className="summary-price-row deposit">
-                <span>Security Deposit (hold):</span>
-                <span>${depositAmount}</span>
-              </div>
-              <div className="summary-price-row total">
-                <span>Total Authorization:</span>
-                <span>${(rentalFee + depositAmount).toFixed(2)}</span>
-              </div>
-            </div>
-
-            <div className="deposit-notice">
-              💳 The security deposit will be held on your card but not charged. 
-              It will be released after you return the item in good condition.
-            </div>
-          </div>
-
-          <div className="payment-card">
-            <h2>Payment Details</h2>
-          <PaymentForm
-            rentalAmount={rentalFee}
-            depositAmount={depositAmount}
-            bookingId={null}
-            onSuccess={handlePaymentSuccess}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const BookingConfirmedView = () => (
-    <div className="confirmation-view">
-      <div className="confirmation-card">
-        <div className="success-icon">✓</div>
-        <h1>Booking Confirmed!</h1>
-        <p className="confirmation-message">
-          Your rental has been successfully booked and payment processed.
-        </p>
-
-        {bookingData && (
-          <div className="confirmation-details">
-            <h3>Booking Details</h3>
-            <div className="confirmation-row">
-              <span>Item:</span>
-              <span>{bookingData.item.title}</span>
-            </div>
-            <div className="confirmation-row">
-              <span>Start Date:</span>
-              <span>{bookingData.startDate}</span>
-            </div>
-            <div className="confirmation-row">
-              <span>Duration:</span>
-              <span>{bookingData.hours} hours</span>
-            </div>
-            <div className="confirmation-row">
-              <span>Rental Fee Paid:</span>
-              <span>${bookingData.rentalFee.toFixed(2)}</span>
-            </div>
-            <div className="confirmation-row">
-              <span>Deposit Authorized:</span>
-              <span>${bookingData.depositAmount}</span>
-            </div>
-          </div>
-        )}
-
-        <div className="next-steps-card">
-          <h3>What's Next?</h3>
-          <ul>
-            <li>You'll receive a confirmation email shortly</li>
-            <li>The item owner will contact you for pickup details</li>
-            <li>Your security deposit will be released after return</li>
-          </ul>
-        </div>
-
-        <div className="confirmation-actions">
-          <button className="primary-button" onClick={() => setCurrentView('profile')}>
-            View My Rentals
-          </button>
-          <button className="secondary-button" onClick={() => setCurrentView('browse')}>
-            Browse More Items
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const ListItemView = () => (
-    <div className="list-view">
-      <h2 className="page-title">List an Item for Rent</h2>
-      
-      <div className="form-card">
-        <div className="form-group">
-          <label>Item Name</label>
-          <input type="text" placeholder="e.g., DeWalt Cordless Drill" className="form-input" />
-
                     <div className="my-item-actions">
                       <button 
                         className="btn-edit"

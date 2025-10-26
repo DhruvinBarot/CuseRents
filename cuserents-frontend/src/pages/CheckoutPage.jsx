@@ -107,12 +107,12 @@ function CheckoutPage() {
 
         <div className="payment-section">
           <h2>Payment Details</h2>
-          <RentalPaymentForm
-            rentalAmount={rentalFee}
-            depositAmount={depositAmount}
-            bookingId={bookingId}
-            onSuccess={handlePaymentSuccess}
-          />
+         <PaymentForm
+             rentalAmount={rentalFee}
+             depositAmount={depositAmount}
+             bookingId={null}
+             onSuccess={handlePaymentSuccess}
+        />
         </div>
 
       </div>
