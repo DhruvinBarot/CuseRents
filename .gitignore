@@ -1,0 +1,115 @@
+# ============ BACKEND (Django) ============
+
+# Virtual Environment
+CuseRents-backend/venv/
+CuseRents-backend/env/
+CuseRents-backend/ENV/
+
+# Python Cache
+CuseRents-backend/__pycache__/
+CuseRents-backend/*/__pycache__/
+CuseRents-backend/*/*/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Database (KEEP for demo - comment out to exclude)
+# CuseRents-backend/db.sqlite3
+# CuseRents-backend/db.sqlite3-journal
+
+# Django
+CuseRents-backend/*.log
+CuseRents-backend/staticfiles/
+CuseRents-backend/media/
+CuseRents-backend/local_settings.py
+
+# Environment Variables
+CuseRents-backend/.env
+CuseRents-backend/.env.local
+
+# Migrations Cache
+CuseRents-backend/*/migrations/__pycache__/
+
+
+# ============ FRONTEND (React) ============
+
+# Dependencies
+cuserents-frontend/node_modules/
+
+# Production Build
+cuserents-frontend/build/
+cuserents-frontend/dist/
+
+# Environment
+cuserents-frontend/.env
+cuserents-frontend/.env.local
+cuserents-frontend/.env.development.local
+cuserents-frontend/.env.test.local
+cuserents-frontend/.env.production.local
+
+# Logs
+cuserents-frontend/npm-debug.log*
+cuserents-frontend/yarn-debug.log*
+cuserents-frontend/yarn-error.log*
+
+# Testing
+cuserents-frontend/coverage/
+
+# Misc
+cuserents-frontend/.DS_Store
+
+
+# ============ IDE / EDITOR ============
+
+# VS Code
+.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# PyCharm
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+
+# ============ OPERATING SYSTEM ============
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+
+# ============ MISC ============
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Backup files
+*.backup
