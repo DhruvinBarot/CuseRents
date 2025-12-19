@@ -3,7 +3,7 @@ import { searchItems, createItem, getMyItems } from './services/api';
 import { useAuth } from './context/AuthContext';
 import AuthModal from './components/AuthModal';
 import EditItemModal from './components/EditItemModal';
-import BookingModal from './components/BookingModal';
+import PaymentForm from './components/PaymentForm';
 import { 
   Home, Search, PlusCircle, User, MapPin, 
   DollarSign, Package, Wrench, Camera, 
@@ -11,8 +11,6 @@ import {
   ArrowLeft, Calendar
 } from 'lucide-react';
 import './App.css';
-
-import PaymentForm from './components/PaymentForm';
 
 function App() {
   const [currentView, setCurrentView] = useState('home');
@@ -22,7 +20,6 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const [bookingData, setBookingData] = useState(null);
-
   const [showAuthModal, setShowAuthModal] = useState(false);
   
   const { user, isAuthenticated, logout } = useAuth();
@@ -48,7 +45,7 @@ function App() {
     setLoading(true);
     try {
       const data = await searchItems(43.0481, -76.1474, {
-        radius: 50,
+        radius: 20,
         ...(selectedCategory && { category: selectedCategory })
       });
       setItems(data.results || []);
@@ -73,7 +70,6 @@ function App() {
     logout();
     setCurrentView('home');
   };
-  
 
   const handleViewDetails = (item) => {
     setSelectedItem(item);
@@ -85,11 +81,7 @@ function App() {
     setCurrentView('checkout');
   };
 
-  const handlePaymentSuccess = (paymentData) => {
-    console.log('Payment successful:', paymentData);
-    setCurrentView('bookingConfirmed');
-  };
-
+  // ==================== HOME VIEW ====================
   const HomeView = () => (
     <div className="home-view">
       <div className="hero-section">
@@ -164,22 +156,8 @@ function App() {
     </div>
   );
 
-  const BrowseView = () => {
-  const [selectedItemForBooking, setSelectedItemForBooking] = useState(null);
-
-  const handleBookItem = (item) => {
-    if (!isAuthenticated) {
-      setShowAuthModal(true);
-      return;
-    }
-    setSelectedItemForBooking(item);
-  };
-
-  const handleBookingSuccess = () => {
-    setSelectedItemForBooking(null);
-  };
-
-  return (
+  // ==================== BROWSE VIEW ====================
+  const BrowseView = () => (
     <div className="browse-view">
       <div className="search-bar">
         <Search size={20} className="search-icon" />
@@ -194,18 +172,11 @@ function App() {
       </div>
 
       <div className="category-filter">
-        <button
-          className={`filter-chip ${!selectedCategory ? 'active' : ''}`}
-          onClick={() => setSelectedCategory('')}
-        >
+        <button className={`filter-chip ${!selectedCategory ? 'active' : ''}`} onClick={() => setSelectedCategory('')}>
           All
         </button>
         {categories.map((cat) => (
-          <button
-            key={cat.id}
-            className={`filter-chip ${selectedCategory === cat.id ? 'active' : ''}`}
-            onClick={() => setSelectedCategory(cat.id)}
-          >
+          <button key={cat.id} className={`filter-chip ${selectedCategory === cat.id ? 'active' : ''}`} onClick={() => setSelectedCategory(cat.id)}>
             {cat.name}
           </button>
         ))}
@@ -244,10 +215,7 @@ function App() {
                         <span>{item.distance_km || '0.5'}km</span>
                       </div>
                     </div>
-                    <button 
-                      className="rent-button"
-                      onClick={() => handleViewDetails(item)}
-                    >
+                    <button className="rent-button" onClick={() => handleViewDetails(item)}>
                       View Details
                     </button>
                   </div>
@@ -257,26 +225,18 @@ function App() {
           </div>
         </>
       )}
-
-      {selectedItemForBooking && (
-        <BookingModal
-          item={selectedItemForBooking}
-          onClose={() => setSelectedItemForBooking(null)}
-          onSuccess={handleBookingSuccess}
-        />
-      )}
     </div>
   );
-};
 
+  // ==================== ITEM DETAIL VIEW ====================
   const ItemDetailView = () => {
     const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
     const [hours, setHours] = useState(1);
 
     if (!selectedItem) return null;
 
     const CategoryIcon = categories.find(c => c.id === selectedItem.category)?.icon || Package;
+    const isOwnItem = selectedItem.owner?.username === user?.username;
 
     const calculateTotal = () => {
       return (parseFloat(selectedItem.price_per_hour) * hours);
@@ -285,6 +245,11 @@ function App() {
     const depositAmount = parseFloat(selectedItem.deposit || 50);
 
     const handleBooking = () => {
+      if (!isAuthenticated) {
+        setShowAuthModal(true);
+        return;
+      }
+
       if (!startDate || !hours) {
         alert('Please select rental date and duration');
         return;
@@ -316,8 +281,11 @@ function App() {
               <p className="detail-category">{selectedItem.category}</p>
               <div className="detail-location">
                 <MapPin size={16} />
-                <span>{selectedItem.distance_km || '0.5'}km away</span>
+                <span>{selectedItem.distance_km || '0.5'}km away • {selectedItem.address_text}</span>
               </div>
+              <p style={{marginTop: '10px', color: 'var(--text-gray)'}}>
+                by {selectedItem.owner?.username || 'Unknown'} ⭐ {selectedItem.owner?.rating_avg?.toFixed(1) || '5.0'}
+              </p>
             </div>
           </div>
 
@@ -325,68 +293,85 @@ function App() {
             <div className="detail-description">
               <h3>Description</h3>
               <p>{selectedItem.description}</p>
-            </div>
-
-            <div className="pricing-card">
-              <h3>Pricing</h3>
-              <div className="price-row">
-                <span>Hourly Rate:</span>
-                <span className="price-value">${parseFloat(selectedItem.price_per_hour).toFixed(2)}/hr</span>
-              </div>
-              <div className="price-row">
-                <span>Security Deposit:</span>
-                <span className="price-value">${depositAmount}</span>
-              </div>
-            </div>
-
-            <div className="booking-card">
-              <h3>Book This Item</h3>
               
-              <div className="form-group">
-                <label>
-                  <Calendar size={16} />
-                  Rental Start Date
-                </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="form-input"
-                />
+              <div style={{marginTop: '25px'}}>
+                <h3>Pricing</h3>
+                <div className="price-row">
+                  <span>Hourly Rate:</span>
+                  <span className="price-value">${parseFloat(selectedItem.price_per_hour).toFixed(2)}/hr</span>
+                </div>
+                {selectedItem.price_per_day && (
+                  <div className="price-row">
+                    <span>Daily Rate:</span>
+                    <span className="price-value">${parseFloat(selectedItem.price_per_day).toFixed(2)}/day</span>
+                  </div>
+                )}
+                <div className="price-row">
+                  <span>Security Deposit:</span>
+                  <span className="price-value">${depositAmount.toFixed(2)}</span>
+                </div>
               </div>
+            </div>
 
-              <div className="form-group">
-                <label>Duration (hours)</label>
-                <input
-                  type="number"
-                  value={hours}
-                  onChange={(e) => setHours(parseInt(e.target.value) || 1)}
-                  min="1"
-                  className="form-input"
-                />
+            <div>
+              <div className="booking-card">
+                <h3>Book This Item</h3>
+                
+                {isOwnItem ? (
+                  <div style={{padding: '20px', textAlign: 'center', background: '#FEE2E2', borderRadius: '8px'}}>
+                    <p style={{color: '#991b1b', fontWeight: '600'}}>This is your item</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="form-group">
+                      <label>
+                        <Calendar size={16} />
+                        Rental Start Date
+                      </label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="form-input"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Duration (hours)</label>
+                      <input
+                        type="number"
+                        value={hours}
+                        onChange={(e) => setHours(parseInt(e.target.value) || 1)}
+                        min="1"
+                        max="168"
+                        className="form-input"
+                      />
+                    </div>
+
+                    {hours > 0 && startDate && (
+                      <div className="booking-summary">
+                        <div className="summary-row">
+                          <span>Rental Fee ({hours} hrs):</span>
+                          <span>${calculateTotal().toFixed(2)}</span>
+                        </div>
+                        <div className="summary-row">
+                          <span>Deposit (hold):</span>
+                          <span>${depositAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="summary-row total">
+                          <span>Total Authorization:</span>
+                          <span>${(calculateTotal() + depositAmount).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <button className="book-button" onClick={handleBooking}>
+                      Proceed to Payment
+                    </button>
+                  </>
+                )}
               </div>
-
-              {hours > 0 && (
-        <div className="booking-summary">
-    <div className="summary-row">
-      <span>Rental Fee ({hours} hrs):</span>
-      <span>${calculateTotal().toFixed(2)}</span>
-    </div>
-    <div className="summary-row">
-      <span>Deposit (hold):</span>
-      <span>${depositAmount.toFixed(2)}</span>
-    </div>
-    <div className="summary-row total">
-      <span>Total Authorization:</span>
-      <span>${(calculateTotal() + depositAmount).toFixed(2)}</span>
-    </div>
-  </div>
-              )}
-
-              <button className="book-button" onClick={handleBooking}>
-                Proceed to Payment
-              </button>
             </div>
           </div>
         </div>
@@ -394,6 +379,7 @@ function App() {
     );
   };
 
+  // ==================== CHECKOUT VIEW ====================
   const CheckoutView = () => {
     if (!bookingData) {
       setCurrentView('browse');
@@ -402,6 +388,25 @@ function App() {
 
     const { item, startDate, hours, rentalFee, depositAmount } = bookingData;
     const CategoryIcon = categories.find(c => c.id === item.category)?.icon || Package;
+
+    const startDateTime = new Date(startDate);
+    const endDateTime = new Date(startDateTime.getTime() + (hours * 60 * 60 * 1000));
+
+    const backendBookingData = {
+      item_id: item.id,
+      start_time: startDateTime.toISOString(),
+      end_time: endDateTime.toISOString()
+    };
+
+    const handlePaymentSuccess = (paymentData) => {
+      console.log('Payment successful:', paymentData);
+      setBookingData({
+        ...bookingData,
+        bookingCode: paymentData.bookingCode,
+        bookingId: paymentData.bookingId
+      });
+      setCurrentView('bookingConfirmed');
+    };
 
     return (
       <div className="checkout-view">
@@ -448,7 +453,7 @@ function App() {
               </div>
               <div className="summary-price-row deposit">
                 <span>Security Deposit (hold):</span>
-                <span>${depositAmount}</span>
+                <span>${depositAmount.toFixed(2)}</span>
               </div>
               <div className="summary-price-row total">
                 <span>Total Authorization:</span>
@@ -464,11 +469,11 @@ function App() {
 
           <div className="payment-card">
             <h2>Payment Details</h2>
-          <PaymentForm
-            rentalAmount={rentalFee}
-            depositAmount={depositAmount}
-            bookingId={null}
-            onSuccess={handlePaymentSuccess}
+            <PaymentForm
+              rentalAmount={rentalFee}
+              depositAmount={depositAmount}
+              bookingData={backendBookingData}
+              onSuccess={handlePaymentSuccess}
             />
           </div>
         </div>
@@ -476,61 +481,89 @@ function App() {
     );
   };
 
-  const BookingConfirmedView = () => (
-    <div className="confirmation-view">
-      <div className="confirmation-card">
-        <div className="success-icon">✓</div>
-        <h1>Booking Confirmed!</h1>
-        <p className="confirmation-message">
-          Your rental has been successfully booked and payment processed.
-        </p>
+  // ==================== BOOKING CONFIRMED VIEW ====================
+  const BookingConfirmedView = () => {
+    const bookingCode = bookingData?.bookingCode || 'N/A';
 
-        {bookingData && (
-          <div className="confirmation-details">
-            <h3>Booking Details</h3>
-            <div className="confirmation-row">
-              <span>Item:</span>
-              <span>{bookingData.item.title}</span>
+    return (
+      <div className="confirmation-view">
+        <div className="confirmation-card">
+          <div className="success-icon">✅</div>
+          <h1>Booking Confirmed!</h1>
+          <p className="confirmation-message">
+            Your rental has been successfully booked and payment processed.
+          </p>
+
+          <div style={{
+            background: '#F76900',
+            color: 'white',
+            padding: '25px',
+            borderRadius: '12px',
+            margin: '30px 0'
+          }}>
+            <p style={{fontSize: '1rem', marginBottom: '10px', opacity: 0.9}}>Your Booking Code</p>
+            <div style={{
+              fontSize: '3rem',
+              fontWeight: 'bold',
+              letterSpacing: '6px',
+              fontFamily: '"Courier New", monospace'
+            }}>
+              {bookingCode}
             </div>
-            <div className="confirmation-row">
-              <span>Start Date:</span>
-              <span>{bookingData.startDate}</span>
-            </div>
-            <div className="confirmation-row">
-              <span>Duration:</span>
-              <span>{bookingData.hours} hours</span>
-            </div>
-            <div className="confirmation-row">
-              <span>Rental Fee Paid:</span>
-              <span>${bookingData.rentalFee.toFixed(2)}</span>
-            </div>
-            <div className="confirmation-row">
-              <span>Deposit Authorized:</span>
-              <span>${bookingData.depositAmount}</span>
-            </div>
+            <p style={{fontSize: '0.9rem', marginTop: '10px', opacity: 0.9}}>
+              Show this code when picking up the item
+            </p>
           </div>
-        )}
 
-        <div className="next-steps-card">
-          <h3>What's Next?</h3>
-          <ul>
-            <li>You'll receive a confirmation email shortly</li>
-            <li>The item owner will contact you for pickup details</li>
-            <li>Your security deposit will be released after return</li>
-          </ul>
-        </div>
+          {bookingData && (
+            <div className="confirmation-details">
+              <h3>Booking Details</h3>
+              <div className="confirmation-row">
+                <span>Item:</span>
+                <span>{bookingData.item.title}</span>
+              </div>
+              <div className="confirmation-row">
+                <span>Start Date:</span>
+                <span>{bookingData.startDate}</span>
+              </div>
+              <div className="confirmation-row">
+                <span>Duration:</span>
+                <span>{bookingData.hours} hours</span>
+              </div>
+              <div className="confirmation-row">
+                <span>Rental Fee Paid:</span>
+                <span>${bookingData.rentalFee.toFixed(2)}</span>
+              </div>
+              <div className="confirmation-row">
+                <span>Deposit Authorized:</span>
+                <span>${bookingData.depositAmount.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
 
-        <div className="confirmation-actions">
-          <button className="primary-button" onClick={() => setCurrentView('profile')}>
-            View My Rentals
-          </button>
-          <button className="secondary-button" onClick={() => setCurrentView('browse')}>
-            Browse More Items
-          </button>
+          <div className="next-steps-card">
+            <h3>What's Next?</h3>
+            <ul>
+              <li>✅ Booking code: <strong>{bookingCode}</strong> - saved to your account</li>
+              <li>📧 Check your email for confirmation</li>
+              <li>👤 The owner will contact you for pickup details</li>
+              <li>💳 Deposit will be released after safe return</li>
+              <li>⭐ Leave a review to earn bonus reward points!</li>
+            </ul>
+          </div>
+
+          <div className="confirmation-actions">
+            <button className="primary-button" onClick={() => setCurrentView('profile')}>
+              View My Rentals
+            </button>
+            <button className="secondary-button" onClick={() => setCurrentView('browse')}>
+              Browse More Items
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ==================== LIST ITEM VIEW ====================
   const ListItemView = () => {
@@ -575,7 +608,7 @@ function App() {
           category: formData.category,
           price_per_hour: parseFloat(formData.price_per_hour),
           price_per_day: formData.price_per_day ? parseFloat(formData.price_per_day) : null,
-          deposit: parseFloat(formData.deposit) || 0,
+          deposit: parseFloat(formData.deposit) || 50,
           address_text: formData.address_text,
           lat: parseFloat(formData.lat) || 43.0481,
           lng: parseFloat(formData.lng) || -76.1474,
@@ -646,7 +679,7 @@ function App() {
           <div className="form-row">
             <div className="form-group">
               <label>Deposit ($)</label>
-              <input type="number" name="deposit" value={formData.deposit} onChange={handleChange} step="0.01" placeholder="20.00" className="form-input" />
+              <input type="number" name="deposit" value={formData.deposit} onChange={handleChange} step="0.01" placeholder="50.00" className="form-input" />
             </div>
             <div className="form-group">
               <label>CO₂ Offset (kg)</label>
@@ -660,17 +693,12 @@ function App() {
           <div className="form-row">
             <div className="form-group">
               <label>Latitude (optional)</label>
-              <input type="number" name="lat" value={formData.lat} onChange={handleChange} step="0.000001" placeholder="43.0361" className="form-input" />
+              <input type="number" name="lat" value={formData.lat} onChange={handleChange} step="0.000001" placeholder="43.0481" className="form-input" />
             </div>
             <div className="form-group">
               <label>Longitude (optional)</label>
-              <input type="number" name="lng" value={formData.lng} onChange={handleChange} step="0.000001" placeholder="-76.1275" className="form-input" />
+              <input type="number" name="lng" value={formData.lng} onChange={handleChange} step="0.000001" placeholder="-76.1474" className="form-input" />
             </div>
-          </div>
-          <div className="form-group">
-            <label>Photo URL (optional)</label>
-            <input type="url" name="photo_url" value={formData.photo_url} onChange={handleChange} placeholder="https://example.com/photo.jpg" className="form-input" />
-            <small style={{color: 'var(--text-gray)', fontSize: '0.85rem'}}>Leave blank to use placeholder image</small>
           </div>
           <button type="submit" className="submit-button" disabled={submitting}>
             {submitting ? <><div className="spinner-small"></div>Creating...</> : <><PlusCircle size={20} />List Item</>}
@@ -679,16 +707,17 @@ function App() {
         <div className="info-box">
           <h4>💡 Listing Tips</h4>
           <ul>
-            <li>Price competitively (check similar items in Browse)</li>
-            <li>Write clear, detailed descriptions</li>
-            <li>Use Syracuse addresses for accurate distance calculations</li>
-            <li>Set realistic deposits to protect your item</li>
+            <li>Price competitively (check similar items)</li>
+            <li>Write clear descriptions</li>
+            <li>Use Syracuse addresses</li>
+            <li>Set realistic deposits</li>
           </ul>
         </div>
       </div>
     );
   };
 
+  // ==================== PROFILE VIEW ====================
   const ProfileView = () => {
     const [myItems, setMyItems] = useState([]);
     const [myBookings, setMyBookings] = useState([]);
@@ -722,9 +751,7 @@ function App() {
       try {
         const { getMyBookings } = await import('./services/api');
         const data = await getMyBookings();
-        console.log('Fetched bookings data:', data);
         const bookingsArray = data.results || data || [];
-        console.log('Bookings array:', bookingsArray);
         setMyBookings(Array.isArray(bookingsArray) ? bookingsArray : []);
       } catch (err) {
         console.error('Error fetching bookings:', err);
@@ -787,18 +814,8 @@ function App() {
       );
     }
 
-    const myRentalRequests = myBookings.filter(b => {
-      console.log('Filtering rental request - Renter:', b.renter?.username, 'User:', user?.username);
-      return b.renter?.username === user?.username;
-    });
-    
-    const bookingRequests = myBookings.filter(b => {
-      console.log('Filtering booking request - Owner:', b.owner?.username, 'User:', user?.username);
-      return b.owner?.username === user?.username;
-    });
-
-    console.log('My rental requests:', myRentalRequests);
-    console.log('Booking requests for my items:', bookingRequests);
+    const myRentalRequests = myBookings.filter(b => b.renter?.username === user?.username);
+    const bookingRequests = myBookings.filter(b => b.owner?.username === user?.username);
 
     return (
       <div className="profile-view">
@@ -925,6 +942,7 @@ function App() {
     );
   };
 
+  // ==================== MAIN RENDER ====================
   return (
     <div className="App">
       <nav className="navbar">

@@ -6,11 +6,17 @@ import {
   useStripe,
   useElements
 } from '@stripe/react-stripe-js';
+import { createBooking } from '../services/api';
 import './PaymentForm.css';
 
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || 'pk_test_your_key');
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || 'pk_test_demo');
 
-const CheckoutForm = ({ rentalAmount, depositAmount, onSuccess }) => {
+const CheckoutForm = ({ 
+  rentalAmount, 
+  depositAmount, 
+  bookingData,
+  onSuccess 
+}) => {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
@@ -22,38 +28,64 @@ const CheckoutForm = ({ rentalAmount, depositAmount, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!stripe || !elements) return;
+    if (!stripe || !elements) {
+      setMessage('Stripe not loaded. Please refresh the page.');
+      return;
+    }
     
     setLoading(true);
     setMessage('');
 
     try {
-      // For demo purposes - simulate payment success
-      // In production, replace this with actual Stripe API calls
-      
+      // Step 1: Process payment (demo mode)
       setStep(2);
       setMessage('Processing rental fee...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 800));
 
+      // Step 2: Authorize deposit hold (demo mode)
       setStep(3);
       setMessage('Authorizing deposit hold...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 800));
 
+      // Step 3: Create booking in Django backend
       setStep(4);
+      setMessage('Creating booking...');
+      
+      console.log('Creating booking with data:', bookingData);
+      
+      const bookingResponse = await createBooking({
+        item_id: bookingData.item_id,
+        start_time: bookingData.start_time,
+        end_time: bookingData.end_time,
+        wallet_credit_used: 0
+      });
+      
+      console.log('Booking created:', bookingResponse);
+
+      // Step 4: Success
       setMessage('Payment successful! Booking confirmed.');
       
-      // Call success callback
+      // Extract booking code
+      const bookingCode = bookingResponse.booking_code || 
+                         bookingResponse.booking?.booking_code || 
+                         'SUCCESS';
+      
+      // Call success callback with payment and booking data
       setTimeout(() => {
         if (onSuccess) {
           onSuccess({
             rentalPaymentIntentId: 'demo_rental_' + Date.now(),
-            depositPaymentIntentId: 'demo_deposit_' + Date.now()
+            depositPaymentIntentId: 'demo_deposit_' + Date.now(),
+            bookingCode: bookingCode,
+            bookingId: bookingResponse.id || bookingResponse.booking?.id
           });
         }
       }, 1000);
 
     } catch (error) {
-      setMessage(`Error: ${error.message}`);
+      console.error('Payment/Booking error:', error);
+      setMessage(`Error: ${error.response?.data?.detail || error.message || 'Payment failed'}`);
+      setStep(1);
     }
     
     setLoading(false);
@@ -99,18 +131,21 @@ const CheckoutForm = ({ rentalAmount, depositAmount, onSuccess }) => {
       <div className="card-element-container">
         <label>Card Details</label>
         <CardElement options={cardStyle} />
+        <p style={{fontSize: '0.85rem', color: '#666', marginTop: '8px'}}>
+          💳 Demo Mode: Use any card number (e.g., 4242 4242 4242 4242)
+        </p>
       </div>
 
       {step > 1 && (
         <div className="payment-steps">
           <div className={step >= 2 ? 'step active' : 'step'}>
-            ✓ Rental fee charged
+            ✓ Rental fee processed
           </div>
           <div className={step >= 3 ? 'step active' : 'step'}>
             ✓ Deposit authorized
           </div>
           <div className={step >= 4 ? 'step active' : 'step'}>
-            ✓ Booking confirmed
+            ✓ Booking created
           </div>
         </div>
       )}
@@ -132,12 +167,18 @@ const CheckoutForm = ({ rentalAmount, depositAmount, onSuccess }) => {
   );
 };
 
-const PaymentForm = ({ rentalAmount, depositAmount, bookingId, onSuccess }) => {
+const PaymentForm = ({ 
+  rentalAmount, 
+  depositAmount, 
+  bookingData,
+  onSuccess 
+}) => {
   return (
     <Elements stripe={stripePromise}>
       <CheckoutForm 
         rentalAmount={rentalAmount}
         depositAmount={depositAmount}
+        bookingData={bookingData}
         onSuccess={onSuccess}
       />
     </Elements>
