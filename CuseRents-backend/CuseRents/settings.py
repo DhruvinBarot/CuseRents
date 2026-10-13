@@ -7,10 +7,23 @@ import dj_database_url
 # Build paths inside the project
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Security Settings
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-production')
-DEBUG = config('DEBUG', default=True, cast=bool)
+# Security Settings (production-safe defaults; local .env sets DEBUG=True)
+DEBUG = config('DEBUG', default=False, cast=bool)
+SECRET_KEY = config('SECRET_KEY')
+if not DEBUG and (len(SECRET_KEY) < 40 or SECRET_KEY.startswith(('django-insecure', 'change-me', 'your-'))):
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured('Set a long random SECRET_KEY for production (python -c "import secrets; print(secrets.token_urlsafe(50))")')
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+CSRF_TRUSTED_ORIGINS = [o for o in config('CSRF_TRUSTED_ORIGINS', default='').split(',') if o]
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Render/Railway terminate TLS at their proxy
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=3600, cast=int)  # raise to 31536000 once HTTPS is confirmed stable
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
 
 # Application definition
 INSTALLED_APPS = [
@@ -36,7 +49,6 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
     'dj_rest_auth',
     'dj_rest_auth.registration',
-    'django_extensions',
     
     # Local apps
     'users',
@@ -163,8 +175,12 @@ REST_FRAMEWORK = {
     'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S%z',
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
-    ]
+        *(['rest_framework.renderers.BrowsableAPIRenderer'] if DEBUG else []),
+    ],
+    # shortcut: default LocMem cache means limits are per gunicorn worker; use Redis cache if abuse shows up
+    'DEFAULT_THROTTLE_RATES': {
+        'auth': config('AUTH_THROTTLE_RATE', default='10/minute'),
+    },
 }
 
 # JWT Settings
@@ -240,5 +256,6 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'stripe': {'level': 'WARNING'},  # stripe-python logs every request at INFO
     },
 }

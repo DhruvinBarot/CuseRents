@@ -2,30 +2,16 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-    TokenVerifyView,
-)
+from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),
     
-    # API Documentation (optional - for browsable API)
-    path('api-auth/', include('rest_framework.urls')),
-    
-    # JWT Authentication
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    # Login/register live in users.urls (rate limited); only token refresh is needed here.
+    # Removed unused duplicate auth routes (simplejwt obtain/verify, dj-rest-auth, allauth google, api-auth)
+    # so they can't be used to bypass the login throttle.
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
-    
-    # DJ-Rest-Auth (includes registration, login, logout)
-    path('api/auth/', include('dj_rest_auth.urls')),
-    path('api/auth/registration/', include('dj_rest_auth.registration.urls')),
-    
-    # Google OAuth
-    path('api/auth/google/', include('allauth.socialaccount.providers.google.urls')),
     
     # App URLs
     path('api/users/', include('users.urls')),

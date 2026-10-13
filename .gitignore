@@ -14,9 +14,9 @@ CuseRents-backend/*/*/__pycache__/
 *.pyd
 .Python
 
-# Database (KEEP for demo - comment out to exclude)
-# CuseRents-backend/db.sqlite3
-# CuseRents-backend/db.sqlite3-journal
+# Database (local data only; holds real accounts and Stripe ids, never commit)
+CuseRents-backend/db.sqlite3
+CuseRents-backend/db.sqlite3-journal
 
 # Django
 CuseRents-backend/*.log

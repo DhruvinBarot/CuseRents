@@ -52,10 +52,18 @@ Each phase ends with a working app, a quick manual test, and a push to GitHub.
 - **You:** set `CLOUDINARY_*` in `.env` for photo uploads; real SMTP settings come with deploy (Phase 5)
 
 ## Phase 4: Production hardening
-- [ ] `DEBUG=False`, real `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, secure cookies, HTTPS redirect
-- [ ] Postgres via `DATABASE_URL`
-- [ ] Rate-limit auth endpoints, trim `requirements.txt` (ipython etc. aren't needed in prod)
-- [ ] Terms of Service and a Privacy page (Stripe requires these for live mode)
+- [x] `DEBUG` defaults to False; server refuses to start in production without a long random `SECRET_KEY`
+- [x] Production-only: HTTPS redirect, secure cookies, HSTS (1h to start), proxy SSL header, nosniff, frame DENY; `CSRF_TRUSTED_ORIGINS` from env; browsable API only in DEBUG (`manage.py check --deploy` clean apart from HSTS subdomain/preload, which wait for a real domain)
+- [x] Login/register rate limited (10/min per IP, `AUTH_THROTTLE_RATE`)
+- [x] Removed 5 unused duplicate auth routes (simplejwt obtain/verify, dj-rest-auth, allauth Google, api-auth) that bypassed the limit
+- [x] Requirements trimmed 53 → 35 (ipython, django-extensions etc.); verified with a clean install + full test run
+- [x] `db.sqlite3` no longer tracked (gitignored); fresh setup = `migrate` + `createsuperuser`
+- [x] Frontend: stateful views moved out of `App` so they stop remounting (root cause of the profile loop; booking form no longer resets when the login popup opens)
+- [x] Booking buttons disabled while a request runs (double "Mark Returned" click hit Stripe twice)
+- [x] Draft Terms of Service + Privacy Policy pages, linked in the footer (**have them reviewed before live mode**)
+- [x] 19 backend tests
+- Postgres: already supported via `DATABASE_URL` (psycopg2 installed); set up in Phase 5
+- Note: old copies of `db.sqlite3` (demo data only, from before testing) remain in git history
 
 ## Phase 5: Deploy (when you say go)
 - [ ] Backend: Render/Railway (gunicorn + whitenoise already present) + managed Postgres

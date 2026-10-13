@@ -94,8 +94,9 @@ source venv/bin/activate
 # 4. Install all dependencies
 pip install -r requirements.txt
 
-# 5. Run migrations (database already exists, but just in case)
+# 5. Create the database (it is not in git) and an admin account
 python manage.py migrate
+python manage.py createsuperuser
 
 # 6. Start the server
 python manage.py runserver
