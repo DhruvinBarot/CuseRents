@@ -168,7 +168,6 @@ class Booking(models.Model):
         return None
     
     @property
-    @property
     def duration_hours(self):
         """Calculate booking duration in hours"""
         if self.end_time and self.start_time:
@@ -176,7 +175,6 @@ class Booking(models.Model):
             return delta.total_seconds() / 3600
         return 0
     
-    @property
     @property
     def is_overdue(self):
         """Check if booking is past end_time and not returned"""

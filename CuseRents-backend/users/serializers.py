@@ -2,7 +2,6 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.password_validation import validate_password
 from rest_framework_simplejwt.tokens import RefreshToken
-from rewards.models import Wallet
 
 User = get_user_model()
 
@@ -44,7 +43,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return value
     
     def create(self, validated_data):
-        """Create user and associated wallet"""
+        """Create user (wallet is created by the rewards post_save signal)"""
         validated_data.pop('password_confirm')
         
         user = User.objects.create_user(
@@ -55,9 +54,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             last_name=validated_data.get('last_name', ''),
             phone=validated_data.get('phone', ''),
         )
-        
-        # Create wallet for user
-        Wallet.objects.create(user=user)
         
         return user
 

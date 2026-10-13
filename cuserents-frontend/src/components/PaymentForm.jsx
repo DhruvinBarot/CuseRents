@@ -9,7 +9,8 @@ import {
 import { createBooking } from '../services/api';
 import './PaymentForm.css';
 
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || 'pk_test_demo');
+// If Stripe.js is blocked (ad blockers, offline) resolve to null so the form shows "Stripe not loaded" instead of crashing
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || 'pk_test_demo').catch(() => null);
 
 const CheckoutForm = ({ 
   rentalAmount, 

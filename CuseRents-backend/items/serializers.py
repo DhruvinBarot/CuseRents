@@ -29,7 +29,7 @@ class ItemListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
         fields = [
-            'id', 'title', 'category', 'price_per_hour', 'price_per_day',
+            'id', 'title', 'description', 'category', 'price_per_hour', 'price_per_day',
             'deposit', 'photo_url', 'rating_avg', 'total_rentals',
             'lat', 'lng', 'address_text', 'is_available',
             'owner', 'distance_km', 'has_video_demo', 'carbon_offset_kg'

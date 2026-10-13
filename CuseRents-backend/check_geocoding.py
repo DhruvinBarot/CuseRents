@@ -1,6 +1,6 @@
 """
 Test script for geocoding service
-Run with: python test_geocoding.py
+Run with: python check_geocoding.py (manual, needs GOOGLE_MAPS_API_KEY)
 """
 
 import os

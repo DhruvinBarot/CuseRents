@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
+const API_BASE_URL = `${process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000'}/api`;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -20,6 +20,30 @@ api.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
+  }
+);
+
+// On 401, swap the refresh token for a new access token once and retry
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const original = error.config;
+    const refresh = localStorage.getItem('refresh_token');
+    if (error.response?.status !== 401 || original._retried || !refresh) {
+      return Promise.reject(error);
+    }
+    original._retried = true;
+    try {
+      const { data } = await axios.post(`${API_BASE_URL}/token/refresh/`, { refresh });
+      localStorage.setItem('access_token', data.access);
+      if (data.refresh) localStorage.setItem('refresh_token', data.refresh);
+      original.headers.Authorization = `Bearer ${data.access}`;
+      return api(original);
+    } catch (refreshError) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      return Promise.reject(error);
+    }
   }
 );
 
@@ -150,7 +174,7 @@ export const deleteItem = async (itemId) => {
 // Get all items (for My Listings)
 export const getMyItems = async () => {
   try {
-    const response = await api.get('/items/items/');
+    const response = await api.get('/items/items/', { params: { mine: true } });
     return response.data;
   } catch (error) {
     console.error('Error fetching items:', error);
@@ -195,6 +219,21 @@ export const rejectBooking = async (bookingId) => {
     return response.data;
   } catch (error) {
     console.error('Error rejecting booking:', error);
+    throw error;
+  }
+};
+
+export const getStats = async () => {
+  const response = await api.get('/items/items/stats/');
+  return response.data;
+};
+
+export const activateBooking = async (bookingId) => {
+  try {
+    const response = await api.post(`/bookings/bookings/${bookingId}/activate/`);
+    return response.data;
+  } catch (error) {
+    console.error('Error activating booking:', error);
     throw error;
   }
 };

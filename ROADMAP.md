@@ -11,14 +11,21 @@ Each phase ends with a working app, a quick manual test, and a push to GitHub.
 - Deferred to Phase 4: stop committing `db.sqlite3` (the README relies on it for demo data; prod uses Postgres)
 
 ## Phase 1: Frontend and backend connected, core flows working
-- [ ] Frontend API URL from `REACT_APP_API_URL` instead of the hardcoded `127.0.0.1:8000`
-- [ ] Fix the crash bug: `@property @property` on `Booking.duration_hours` / `is_overdue`
-- [ ] Make sure every user gets a Wallet (signal on user create); booking `complete` needs it
-- [ ] JWT refresh: an axios interceptor that refreshes on 401, so users aren't logged out after 60 min
-- [ ] End-to-end test: register → login → list item → browse/search → book → owner accepts → activate → complete
-- [ ] Add the missing `activateBooking` to api.js and an "Activate/Picked up" button in the profile
-- [ ] Home page stats from the API instead of hardcoded 12 / 95kg / $2,400
-- [ ] Item photo upload (Cloudinary is configured; check the item form actually sends images)
+- [x] Frontend API URL from `REACT_APP_API_URL` (+ `cuserents-frontend/.env.example`)
+- [x] Fix crash bug: `@property @property` on `Booking.duration_hours` / `is_overdue`
+- [x] Every user gets a Wallet (post_save signal + backfill migration); booking `complete` needs it
+- [x] JWT refresh on 401 + `token_blacklist` app so logout/rotation actually work
+- [x] Fix pricing bug: daily rate was prorated per hour (2h of a $20/day item cost $1.67), now per started day; frontend mirrors it
+- [x] Fix same-day bookings rejected as "in the past" (date-only input parsed as UTC midnight); now date + time picker
+- [x] Fix search box losing focus on every keystroke
+- [x] "My Listings" uses `?mine=true` instead of filtering the first 20 items client-side
+- [x] Mark Picked Up / Mark Returned buttons (activate / complete)
+- [x] Home stats from `/api/items/items/stats/`
+- [x] SQLite path no longer depends on the folder you start the server from
+- [x] App no longer crashes when Stripe.js is blocked
+- [x] Backend test for the full lifecycle + daily-rate pricing (`python manage.py test bookings`)
+- Moved to Phase 3: item photo upload (the UI shows category icons, never `photo_url`, so upload needs a display change too)
+- Known: without `GOOGLE_MAPS_API_KEY` addresses aren't geocoded; the list form falls back to downtown Syracuse coordinates
 
 ## Phase 2: Stripe payments (the real thing)
 Payments today are **fake**: `PaymentForm.jsx` sleeps for 800 ms and calls it paid. The backend endpoint trusts whatever amount the client sends and doesn't require login.
@@ -32,6 +39,7 @@ Payments today are **fake**: `PaymentForm.jsx` sleeps for 800 ms and calls it pa
 - [ ] **Decision needed: owner payouts.** Paying owners real money requires Stripe Connect (Express accounts, onboarding, `transfer_data`). Without it, the owner's "wallet balance" is just a number and you pay owners by hand
 
 ## Phase 3: Finish the half-built features
+- [ ] Item photos: upload to Cloudinary and show them on cards/detail
 - [ ] Reviews API (the model exists, `urls.py` is empty) and UI on item detail
 - [ ] Rewards/wallet API (the model exists, no endpoints) and the profile display
 - [ ] Booking emails (request, accepted, reminder) via a real SMTP provider

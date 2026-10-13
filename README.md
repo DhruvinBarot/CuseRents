@@ -137,18 +137,23 @@ REACT_APP_API_URL=http://127.0.0.1:8000
 
 ## 🔗 API Endpoints (Backend)
 
-| Method | Endpoint                       | Description                  |
-| ------ | ------------------------------ | ---------------------------- |
-| `POST` | `/api/auth/register/`          | Register new user            |
-| `POST` | `/api/auth/login/`             | User login                   |
-| `GET`  | `/api/items/`                  | Browse items                 |
-| `POST` | `/api/items/`                  | List new item                |
-| `GET`  | `/api/items/mine/`             | User’s listed items          |
-| `GET`  | `/api/rentals/mine/`           | Items user has rented        |
-| `POST` | `/api/rentals/`                | Create booking               |
-| `POST` | `/api/payments/create-intent/` | Create Stripe payment intent |
-| `GET`  | `/api/reviews/`                | Get reviews for items        |
-| `GET`  | `/api/rewards/`                | User reward stats            |
+| Method | Endpoint                                   | Description                         |
+| ------ | -------------------------------------------- | ----------------------------------- |
+| `POST` | `/api/users/auth/register/`                  | Register (returns JWT tokens)       |
+| `POST` | `/api/users/auth/login/`                     | Login with username or email        |
+| `GET`  | `/api/users/auth/me/`                        | Current user + wallet               |
+| `POST` | `/api/token/refresh/`                        | Refresh access token                |
+| `GET`  | `/api/items/items/search/?lat=&lng=&radius=` | Items near a location               |
+| `GET`  | `/api/items/items/?mine=true`                | Your own listings                   |
+| `GET`  | `/api/items/items/stats/`                    | Home page stats                     |
+| `POST` | `/api/items/items/`                          | List a new item                     |
+| `GET`  | `/api/bookings/bookings/`                    | Your bookings (as renter or owner)  |
+| `POST` | `/api/bookings/bookings/`                    | Request a booking                   |
+| `POST` | `/api/bookings/bookings/{id}/accept/`        | Owner accepts (also `reject`)       |
+| `POST` | `/api/bookings/bookings/{id}/activate/`      | Pickup confirmed                    |
+| `POST` | `/api/bookings/bookings/{id}/complete/`      | Return confirmed, rewards credited  |
+
+Run backend tests: `python manage.py test`
 
 ---
 

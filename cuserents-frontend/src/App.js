@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { searchItems, createItem, getMyItems } from './services/api';
+import { searchItems, createItem, getMyItems, getStats, activateBooking, completeBooking } from './services/api';
 import { useAuth } from './context/AuthContext';
 import AuthModal from './components/AuthModal';
 import EditItemModal from './components/EditItemModal';
@@ -21,6 +21,7 @@ function App() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [bookingData, setBookingData] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [stats, setStats] = useState(null);
   
   const { user, isAuthenticated, logout } = useAuth();
 
@@ -34,6 +35,10 @@ function App() {
     { id: 'books', name: 'Books', icon: Book, color: '#F76900' },
     { id: 'other', name: 'Other', icon: Package, color: '#FF8C42' },
   ];
+
+  useEffect(() => {
+    getStats().then(setStats).catch((err) => console.error('Error fetching stats:', err));
+  }, []);
 
   useEffect(() => {
     if (currentView === 'browse') {
@@ -91,16 +96,16 @@ function App() {
         
         <div className="hero-stats">
           <div className="stat-item">
-            <div className="stat-number">12</div>
+            <div className="stat-number">{stats ? stats.items_available : '–'}</div>
             <div className="stat-label">Items Available</div>
           </div>
           <div className="stat-item">
-            <div className="stat-number">95kg</div>
+            <div className="stat-number">{stats ? `${stats.co2_saved_kg}kg` : '–'}</div>
             <div className="stat-label">CO₂ Saved</div>
           </div>
           <div className="stat-item">
-            <div className="stat-number">$2,400</div>
-            <div className="stat-label">Money Saved</div>
+            <div className="stat-number">{stats ? `$${Math.round(stats.rental_volume).toLocaleString()}` : '–'}</div>
+            <div className="stat-label">Rented So Far</div>
           </div>
         </div>
 
@@ -239,7 +244,10 @@ function App() {
     const isOwnItem = selectedItem.owner?.username === user?.username;
 
     const calculateTotal = () => {
-      return (parseFloat(selectedItem.price_per_hour) * hours);
+      // Mirrors backend pricing: hourly, capped by the daily rate per started day
+      const hourly = parseFloat(selectedItem.price_per_hour) * hours;
+      const daily = parseFloat(selectedItem.price_per_day) * Math.ceil(hours / 24);
+      return selectedItem.price_per_day ? Math.min(hourly, daily) : hourly;
     };
 
     const depositAmount = parseFloat(selectedItem.deposit || 50);
@@ -326,13 +334,13 @@ function App() {
                     <div className="form-group">
                       <label>
                         <Calendar size={16} />
-                        Rental Start Date
+                        Rental Start
                       </label>
                       <input
-                        type="date"
+                        type="datetime-local"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
-                        min={new Date().toISOString().split('T')[0]}
+                        min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
                         className="form-input"
                       />
                     </div>
@@ -434,7 +442,7 @@ function App() {
             <div className="summary-details">
               <div className="summary-detail-row">
                 <span>Start Date:</span>
-                <span>{startDate}</span>
+                <span>{new Date(startDate).toLocaleString()}</span>
               </div>
               <div className="summary-detail-row">
                 <span>Duration:</span>
@@ -524,7 +532,7 @@ function App() {
               </div>
               <div className="confirmation-row">
                 <span>Start Date:</span>
-                <span>{bookingData.startDate}</span>
+                <span>{new Date(bookingData.startDate).toLocaleString()}</span>
               </div>
               <div className="confirmation-row">
                 <span>Duration:</span>
@@ -737,8 +745,7 @@ function App() {
       setLoadingItems(true);
       try {
         const data = await getMyItems();
-        const userItems = data.results?.filter(item => item.owner?.username === user?.username) || [];
-        setMyItems(userItems);
+        setMyItems(data.results || []);
       } catch (err) {
         console.error('Error fetching my items:', err);
       } finally {
@@ -788,6 +795,17 @@ function App() {
       } catch (err) {
         console.error('Error accepting booking:', err);
         alert('Failed to accept booking');
+      }
+    };
+
+    const handleBookingStep = async (apiCall, bookingId, doneMessage) => {
+      try {
+        await apiCall(bookingId);
+        await fetchMyBookings();
+        alert(doneMessage);
+      } catch (err) {
+        console.error('Booking update failed:', err);
+        alert(err.response?.data?.error || 'Failed to update booking');
       }
     };
 
@@ -866,6 +884,16 @@ function App() {
                       <button className="btn-reject" onClick={() => handleRejectBooking(booking.id)}>❌ Reject</button>
                     </div>
                   )}
+                  {booking.status === 'accepted' && (
+                    <div className="booking-actions">
+                      <button className="btn-accept" onClick={() => handleBookingStep(activateBooking, booking.id, 'Pickup confirmed, rental started')}>📦 Mark Picked Up</button>
+                    </div>
+                  )}
+                  {booking.status === 'active' && (
+                    <div className="booking-actions">
+                      <button className="btn-accept" onClick={() => handleBookingStep(completeBooking, booking.id, 'Return confirmed, rental completed ✅')}>✅ Mark Returned</button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -890,6 +918,11 @@ function App() {
                   <p className="booking-owner">Owner: {booking.owner?.username}</p>
                   <p className="booking-time">📅 {new Date(booking.start_time).toLocaleString()} → {new Date(booking.end_time).toLocaleString()}</p>
                   <p className="booking-price">💰 ${parseFloat(booking.total_price).toFixed(2)}</p>
+                  {booking.status === 'accepted' && (
+                    <div className="booking-actions">
+                      <button className="btn-accept" onClick={() => handleBookingStep(activateBooking, booking.id, 'Pickup confirmed, rental started')}>📦 Mark Picked Up</button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -977,7 +1010,7 @@ function App() {
 
       <main className="main-content">
         {currentView === 'home' && <HomeView />}
-        {currentView === 'browse' && <BrowseView />}
+        {currentView === 'browse' && BrowseView()}
         {currentView === 'itemDetail' && <ItemDetailView />}
         {currentView === 'checkout' && <CheckoutView />}
         {currentView === 'bookingConfirmed' && <BookingConfirmedView />}

@@ -3,6 +3,8 @@ from .models import Booking
 from items.models import Item
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from decimal import Decimal, ROUND_HALF_UP
+import math
 
 User = get_user_model()
 
@@ -104,13 +106,13 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         validated_data.pop('item_id')
         
         duration = validated_data['end_time'] - validated_data['start_time']
-        hours = duration.total_seconds() / 3600
-        days = hours / 24
+        hours = Decimal(duration.total_seconds()) / 3600
         
-        hourly_price = float(item.price_per_hour) * hours
-        daily_price = float(item.price_per_day) * days if item.price_per_day else float('inf')
-        
-        total_price = min(hourly_price, daily_price)
+        # Daily rate is charged per started day, so it only wins for longer rentals
+        total_price = item.price_per_hour * hours
+        if item.price_per_day:
+            total_price = min(total_price, item.price_per_day * math.ceil(hours / 24))
+        total_price = total_price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         reward_points = int(total_price * 10)
         
         booking = Booking.objects.create(

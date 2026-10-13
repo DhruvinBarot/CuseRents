@@ -20,8 +20,11 @@ class ItemViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'price_per_hour', 'rating_avg']
     
     def get_queryset(self):
-        """Get items queryset"""
-        return Item.objects.select_related('owner').prefetch_related('videos')
+        """Get items queryset (?mine=true limits to the current user's items)"""
+        queryset = Item.objects.select_related('owner').prefetch_related('videos')
+        if self.request.query_params.get('mine') == 'true' and self.request.user.is_authenticated:
+            queryset = queryset.filter(owner=self.request.user)
+        return queryset
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
@@ -200,6 +203,18 @@ class ItemViewSet(viewsets.ModelViewSet):
             ]
         })
     
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Platform-wide numbers for the home page"""
+        from django.db.models import Sum
+        from django.contrib.auth import get_user_model
+        from bookings.models import Booking
+        return Response({
+            'items_available': Item.objects.filter(is_available=True).count(),
+            'co2_saved_kg': get_user_model().objects.aggregate(t=Sum('co2_saved_kg'))['t'] or 0,
+            'rental_volume': Booking.objects.filter(status='completed').aggregate(t=Sum('total_price'))['t'] or 0,
+        })
+
     @action(detail=False, methods=['get'])
     def nearby(self, request):
         """
