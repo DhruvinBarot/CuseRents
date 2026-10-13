@@ -15,6 +15,11 @@ if not DEBUG and (len(SECRET_KEY) < 40 or SECRET_KEY.startswith(('django-insecur
     raise ImproperlyConfigured('Set a long random SECRET_KEY for production (python -c "import secrets; print(secrets.token_urlsafe(50))")')
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 CSRF_TRUSTED_ORIGINS = [o for o in config('CSRF_TRUSTED_ORIGINS', default='').split(',') if o]
+# Render sets this to the service's own hostname (e.g. cuserents-api.onrender.com)
+RENDER_EXTERNAL_HOSTNAME = config('RENDER_EXTERNAL_HOSTNAME', default='')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Render/Railway terminate TLS at their proxy

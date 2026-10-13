@@ -65,7 +65,10 @@ Each phase ends with a working app, a quick manual test, and a push to GitHub.
 - Postgres: already supported via `DATABASE_URL` (psycopg2 installed); set up in Phase 5
 - Note: old copies of `db.sqlite3` (demo data only, from before testing) remain in git history
 
-## Phase 5: Deploy (when you say go)
-- [ ] Backend: Render/Railway (gunicorn + whitenoise already present) + managed Postgres
-- [ ] Frontend: Vercel/Netlify with `REACT_APP_API_URL` and `REACT_APP_STRIPE_PUBLISHABLE_KEY`
-- [ ] Stripe live keys + live webhook endpoint, a custom domain, smoke test with a real $1 booking
+## Phase 5: Deploy
+- [x] `render.yaml` Blueprint (API + free Postgres), `build.sh` (install, collectstatic, migrate, first admin from env), Python 3.13 pin
+- [x] Backend trusts its own Render hostname automatically (`RENDER_EXTERNAL_HOSTNAME`)
+- [x] `DEPLOY.md`: step-by-step Render + Vercel + Stripe webhook
+- [ ] **You:** create Render + Vercel accounts and follow `DEPLOY.md`
+- [ ] Smoke test on the deployed URLs
+- [ ] Before real money: Terms review, SMTP, Stripe live keys + live webhook, paid Render plans, optional custom domain

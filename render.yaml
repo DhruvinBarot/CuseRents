@@ -1,0 +1,49 @@
+# Render Blueprint: New > Blueprint > pick this repo. Creates the API + a Postgres database.
+databases:
+  - name: cuserents-db
+    plan: free
+    databaseName: cuserents
+    user: cuserents
+
+services:
+  - type: web
+    name: cuserents-api
+    runtime: python
+    plan: free
+    rootDir: CuseRents-backend
+    buildCommand: ./build.sh
+    startCommand: gunicorn CuseRents.wsgi:application --bind 0.0.0.0:$PORT --workers 2
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cuserents-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: PLATFORM_FEE_PERCENT
+        value: "10"
+      # Filled in on the Render dashboard (you'll be prompted):
+      - key: FRONTEND_URL            # https://<your-app>.vercel.app
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS    # same as FRONTEND_URL
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: DJANGO_SUPERUSER_USERNAME
+        sync: false
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
