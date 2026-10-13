@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
 from .models import Booking
+from payments import stripe_ops
+import stripe
 from .serializers import (
     BookingListSerializer,
     BookingCreateSerializer,
@@ -19,8 +21,9 @@ class BookingViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Get bookings for current user (as renter or owner)"""
         user = self.request.user
+        # Owners only see requests once the renter's card is authorized
         return Booking.objects.filter(
-            Q(renter=user) | Q(item__owner=user)
+            Q(renter=user) | (Q(item__owner=user) & ~Q(status='awaiting_payment'))
         ).select_related('item', 'renter', 'item__owner').order_by('-created_at')
     
     def get_serializer_class(self):
@@ -91,7 +94,11 @@ class BookingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Reject booking
+        # Release the renter's card authorization, then reject
+        try:
+            stripe_ops.release(booking)
+        except stripe.error.StripeError:
+            return Response({'error': 'Could not release the payment hold, try again'}, status=status.HTTP_502_BAD_GATEWAY)
         booking.status = 'cancelled'
         booking.save()
         
@@ -118,6 +125,17 @@ class BookingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Charge the renter before anything is credited; damage also captures the deposit
+        damage = bool(request.data.get('damage_reported'))
+        if booking.stripe_payment_id:  # shortcut: demo bookings made before Stripe have no payment to capture
+            try:
+                stripe_ops.capture(booking, include_deposit=damage)
+            except stripe.error.StripeError as e:
+                return Response({'error': e.user_message or 'Could not capture payment'}, status=status.HTTP_502_BAD_GATEWAY)
+        if damage:
+            booking.damage_reported = True
+            booking.save(update_fields=['damage_reported'])
+        
         # Mark as completed
         booking.mark_completed()
         
@@ -127,7 +145,6 @@ class BookingViewSet(viewsets.ModelViewSet):
         # Update wallets
         booking.renter.wallet.add_points(renter_points)
         booking.item.owner.wallet.add_points(owner_points)
-        booking.item.owner.wallet.add_balance(booking.total_price - booking.wallet_credit_used)
         booking.item.owner.wallet.lifetime_earned += booking.total_price
         booking.item.owner.wallet.save()
         

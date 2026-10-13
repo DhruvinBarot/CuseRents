@@ -216,6 +216,7 @@ GOOGLE_MAPS_API_KEY = config('GOOGLE_MAPS_API_KEY', default='')
 STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
 STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
+PLATFORM_FEE_PERCENT = config('PLATFORM_FEE_PERCENT', default=10, cast=int)  # CuseRents' cut of each rental fee
 
 # Frontend URL
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')

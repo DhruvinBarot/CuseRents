@@ -6,11 +6,11 @@ import {
   useStripe,
   useElements
 } from '@stripe/react-stripe-js';
-import { createBooking } from '../services/api';
+import { createBooking, createPaymentIntent, confirmPayment } from '../services/api';
 import './PaymentForm.css';
 
 // If Stripe.js is blocked (ad blockers, offline) resolve to null so the form shows "Stripe not loaded" instead of crashing
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || 'pk_test_demo').catch(() => null);
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY).catch(() => null);
 
 const CheckoutForm = ({ 
   rentalAmount, 
@@ -22,73 +22,51 @@ const CheckoutForm = ({
   const elements = useElements();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [step, setStep] = useState(1);
+  const [isError, setIsError] = useState(false);
+  // Reuse the booking on retry so a declined card doesn't leave duplicate unpaid bookings
+  const [bookingId, setBookingId] = useState(null);
 
   const totalHold = parseFloat(rentalAmount) + parseFloat(depositAmount);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!stripe || !elements) {
-      setMessage('Stripe not loaded. Please refresh the page.');
+      setIsError(true);
+      setMessage('Stripe not loaded. Disable ad blockers for this site and refresh.');
       return;
     }
-    
+
     setLoading(true);
-    setMessage('');
-
+    setIsError(false);
     try {
-      // Step 1: Process payment (demo mode)
-      setStep(2);
-      setMessage('Processing rental fee...');
-      await new Promise(resolve => setTimeout(resolve, 800));
+      let id = bookingId;
+      let bookingCode = null;
+      if (!id) {
+        setMessage('Reserving your booking...');
+        const res = await createBooking({ ...bookingData, wallet_credit_used: 0 });
+        id = res.booking.id;
+        setBookingId(id);
+      }
 
-      // Step 2: Authorize deposit hold (demo mode)
-      setStep(3);
-      setMessage('Authorizing deposit hold...');
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      // Step 3: Create booking in Django backend
-      setStep(4);
-      setMessage('Creating booking...');
-      
-      console.log('Creating booking with data:', bookingData);
-      
-      const bookingResponse = await createBooking({
-        item_id: bookingData.item_id,
-        start_time: bookingData.start_time,
-        end_time: bookingData.end_time,
-        wallet_credit_used: 0
+      setMessage('Authorizing your card...');
+      const { clientSecret } = await createPaymentIntent(id);
+      const { error } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: { card: elements.getElement(CardElement) },
       });
-      
-      console.log('Booking created:', bookingResponse);
+      if (error) throw new Error(error.message);
 
-      // Step 4: Success
-      setMessage('Payment successful! Booking confirmed.');
-      
-      // Extract booking code
-      const bookingCode = bookingResponse.booking_code || 
-                         bookingResponse.booking?.booking_code || 
-                         'SUCCESS';
-      
-      // Call success callback with payment and booking data
-      setTimeout(() => {
-        if (onSuccess) {
-          onSuccess({
-            rentalPaymentIntentId: 'demo_rental_' + Date.now(),
-            depositPaymentIntentId: 'demo_deposit_' + Date.now(),
-            bookingCode: bookingCode,
-            bookingId: bookingResponse.id || bookingResponse.booking?.id
-          });
-        }
-      }, 1000);
-
-    } catch (error) {
-      console.error('Payment/Booking error:', error);
-      setMessage(`Error: ${error.response?.data?.detail || error.message || 'Payment failed'}`);
-      setStep(1);
+      // Backend re-checks the payment with Stripe before the booking goes to the owner
+      const confirmed = await confirmPayment(id);
+      bookingCode = confirmed.booking_code;
+      setMessage('Card authorized! Booking sent to the owner.');
+      onSuccess?.({ bookingCode, bookingId: id });
+    } catch (err) {
+      console.error('Payment/Booking error:', err);
+      const data = err.response?.data;
+      const detail = data?.error || data?.non_field_errors?.[0] || data?.detail || err.message;
+      setIsError(true);
+      setMessage(detail || 'Payment failed');
     }
-    
     setLoading(false);
   };
 
@@ -124,32 +102,15 @@ const CheckoutForm = ({
           <span className="amount">${totalHold.toFixed(2)}</span>
         </div>
         <p className="deposit-note">
-          * Security deposit will be held on your card but not charged. 
-          It will be released after you return the item in good condition.
+          * Nothing is charged until the item is returned. Then only the rental fee is charged 
+          and the deposit hold is released (unless damage is reported).
         </p>
       </div>
 
       <div className="card-element-container">
         <label>Card Details</label>
         <CardElement options={cardStyle} />
-        <p style={{fontSize: '0.85rem', color: '#666', marginTop: '8px'}}>
-          💳 Demo Mode: Use any card number (e.g., 4242 4242 4242 4242)
-        </p>
       </div>
-
-      {step > 1 && (
-        <div className="payment-steps">
-          <div className={step >= 2 ? 'step active' : 'step'}>
-            ✓ Rental fee processed
-          </div>
-          <div className={step >= 3 ? 'step active' : 'step'}>
-            ✓ Deposit authorized
-          </div>
-          <div className={step >= 4 ? 'step active' : 'step'}>
-            ✓ Booking created
-          </div>
-        </div>
-      )}
 
       <button 
         type="submit" 
@@ -160,7 +121,7 @@ const CheckoutForm = ({
       </button>
 
       {message && (
-        <div className={`message ${step === 4 ? 'success' : ''}`}>
+        <div className={`message ${isError ? '' : 'success'}`} role="status">
           {message}
         </div>
       )}

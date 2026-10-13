@@ -77,6 +77,9 @@ class User(AbstractUser):
         help_text="Cloudinary URL for profile photo"
     )
     
+    # Stripe Connect Express account that receives this user's rental payouts
+    stripe_account_id = models.CharField(max_length=255, blank=True)
+    
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

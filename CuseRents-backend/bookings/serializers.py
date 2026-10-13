@@ -3,6 +3,7 @@ from .models import Booking
 from items.models import Item
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 import math
 
@@ -86,6 +87,11 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         if start_time < timezone.now():
             raise serializers.ValidationError("Start time cannot be in the past")
         
+        # Card authorizations expire after 7 days and the charge is captured at return
+        if end_time > timezone.now() + timedelta(days=6):
+            raise serializers.ValidationError("Rentals must end within 6 days of booking")
+        
+        # shortcut: unpaid (awaiting_payment) bookings don't hold the slot, so two renters can race to pay; add a short hold if that happens
         overlapping = Booking.objects.filter(
             item=item,
             status__in=['pending', 'accepted', 'active']
@@ -124,7 +130,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
             deposit_amount=item.deposit,
             wallet_credit_used=validated_data.get('wallet_credit_used', 0),
             reward_points_earned=reward_points,
-            status='pending'
+            status='awaiting_payment'
         )
         
         return booking

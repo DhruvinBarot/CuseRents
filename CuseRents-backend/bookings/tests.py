@@ -1,6 +1,17 @@
 from datetime import timedelta
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 from django.utils import timezone
 from rest_framework.test import APITestCase
+
+
+def fake_stripe():
+    """Stand-in for the stripe module: owner account is payout-ready, intents get authorized."""
+    s = MagicMock()
+    s.Account.retrieve.return_value = SimpleNamespace(capabilities={'transfers': 'active'})
+    s.PaymentIntent.create.return_value = SimpleNamespace(id='pi_123', client_secret='pi_123_secret')
+    s.PaymentIntent.retrieve.return_value = SimpleNamespace(id='pi_123', status='requires_capture', client_secret='pi_123_secret')
+    return s
 
 
 class BookingFlowTest(APITestCase):
@@ -19,7 +30,14 @@ class BookingFlowTest(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
 
     def test_full_lifecycle(self):
+        stripe = fake_stripe()
+        with patch('payments.stripe_ops._client', return_value=stripe):
+            self._lifecycle(stripe)
+
+    def _lifecycle(self, stripe):
         owner, renter = self.register('owner'), self.register('renter')
+        from users.models import User
+        User.objects.filter(username='owner').update(stripe_account_id='acct_owner')
 
         self.as_user(owner)
         res = self.client.post('/api/items/items/', {
@@ -42,11 +60,28 @@ class BookingFlowTest(APITestCase):
         self.assertEqual(res.status_code, 201, res.data)
         booking_id = res.data['booking']['id']
         self.assertEqual(res.data['booking']['total_price'], '6.00')
+        self.assertEqual(res.data['booking']['status'], 'awaiting_payment')
+
+        # Owner can't see the request until the card is authorized
+        self.as_user(owner)
+        self.assertEqual(self.client.get('/api/bookings/bookings/').data['count'], 0)
+
+        self.as_user(renter)
+        res = self.client.post('/api/payments/create-intent/', {'booking_id': booking_id})
+        self.assertEqual(res.data, {'clientSecret': 'pi_123_secret'})
+        kwargs = stripe.PaymentIntent.create.call_args.kwargs
+        self.assertEqual(kwargs['amount'], 5600)  # $6 rental + $50 deposit, computed server-side
+        self.assertEqual(kwargs['capture_method'], 'manual')
+        self.assertEqual(kwargs['application_fee_amount'], 60)  # 10% of the rental only
+        self.assertEqual(kwargs['transfer_data'], {'destination': 'acct_owner'})
+        res = self.client.post('/api/payments/confirm/', {'booking_id': booking_id})
+        self.assertEqual(res.data['status'], 'pending', res.data)
 
         self.as_user(owner)
         for step in ('accept', 'activate', 'complete'):
             res = self.client.post(f'/api/bookings/bookings/{booking_id}/{step}/')
             self.assertEqual(res.status_code, 200, (step, res.data))
+        stripe.PaymentIntent.capture.assert_called_once_with('pi_123', amount_to_capture=600)  # deposit released
 
         self.as_user(renter)
         me = self.client.get('/api/users/auth/me/').data

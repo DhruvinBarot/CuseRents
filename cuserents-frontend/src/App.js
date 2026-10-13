@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { searchItems, createItem, getMyItems, getStats, activateBooking, completeBooking } from './services/api';
+import { searchItems, createItem, getMyItems, getStats, activateBooking, completeBooking, startPayoutOnboarding, getPayoutStatus } from './services/api';
 import { useAuth } from './context/AuthContext';
 import AuthModal from './components/AuthModal';
 import EditItemModal from './components/EditItemModal';
@@ -13,7 +13,8 @@ import {
 import './App.css';
 
 function App() {
-  const [currentView, setCurrentView] = useState('home');
+  // Stripe onboarding sends owners back to /?payouts=done|refresh, land them on their profile
+  const [currentView, setCurrentView] = useState(() => new URLSearchParams(window.location.search).has('payouts') ? 'profile' : 'home');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -352,7 +353,7 @@ function App() {
                         value={hours}
                         onChange={(e) => setHours(parseInt(e.target.value) || 1)}
                         min="1"
-                        max="168"
+                        max="144"
                         className="form-input"
                       />
                     </div>
@@ -470,8 +471,8 @@ function App() {
             </div>
 
             <div className="deposit-notice">
-              💳 The security deposit will be held on your card but not charged. 
-              It will be released after you return the item in good condition.
+              💳 Your card is only authorized now. When you return the item, the rental fee is charged
+              and the deposit hold is released (unless the owner reports damage).
             </div>
           </div>
 
@@ -499,7 +500,7 @@ function App() {
           <div className="success-icon">✅</div>
           <h1>Booking Confirmed!</h1>
           <p className="confirmation-message">
-            Your rental has been successfully booked and payment processed.
+            Your card is authorized and your request has been sent to the owner.
           </p>
 
           <div style={{
@@ -555,7 +556,7 @@ function App() {
               <li>✅ Booking code: <strong>{bookingCode}</strong> - saved to your account</li>
               <li>📧 Check your email for confirmation</li>
               <li>👤 The owner will contact you for pickup details</li>
-              <li>💳 Deposit will be released after safe return</li>
+              <li>💳 You're charged only after return; the deposit hold is released then</li>
               <li>⭐ Leave a review to earn bonus reward points!</li>
             </ul>
           </div>
@@ -719,6 +720,7 @@ function App() {
             <li>Write clear descriptions</li>
             <li>Use Syracuse addresses</li>
             <li>Set realistic deposits</li>
+            <li>Set up payouts in your Profile so renters can pay you</li>
           </ul>
         </div>
       </div>
@@ -733,11 +735,13 @@ function App() {
     const [loadingBookings, setLoadingBookings] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
     const [deletingItemId, setDeletingItemId] = useState(null);
+    const [payouts, setPayouts] = useState(null);
 
     useEffect(() => {
       if (isAuthenticated && currentView === 'profile') {
         fetchMyItems();
         fetchMyBookings();
+        getPayoutStatus().then(setPayouts).catch((err) => console.error('Error fetching payout status:', err));
       }
     }, [isAuthenticated, currentView]);
 
@@ -809,6 +813,15 @@ function App() {
       }
     };
 
+    const handleSetUpPayouts = async () => {
+      try {
+        const { url } = await startPayoutOnboarding();
+        window.location.href = url;
+      } catch (err) {
+        alert(err.response?.data?.error || 'Could not start payout setup');
+      }
+    };
+
     const handleRejectBooking = async (bookingId) => {
       if (!window.confirm('Are you sure you want to reject this booking?')) return;
       try {
@@ -863,6 +876,24 @@ function App() {
         </div>
 
         <div className="profile-section">
+          <h3>💸 Payouts</h3>
+          {!payouts ? (
+            <p className="empty-state">Checking payout status...</p>
+          ) : payouts.payouts_ready ? (
+            <p>✅ Payouts are set up. Rental fees go to your bank account through Stripe after each return.</p>
+          ) : (
+            <>
+              <p className="empty-state">
+                {payouts.started ? "Payout setup isn't finished yet." : 'Set up payouts so renters can book your items.'}
+              </p>
+              <button className="secondary-button" onClick={handleSetUpPayouts}>
+                {payouts.started ? 'Continue Payout Setup' : 'Set Up Payouts with Stripe'}
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="profile-section">
           <h3>📬 Booking Requests for My Items ({bookingRequests.length})</h3>
           {loadingBookings ? (
             <div className="loading"><div className="spinner-small"></div><p>Loading...</p></div>
@@ -891,7 +922,8 @@ function App() {
                   )}
                   {booking.status === 'active' && (
                     <div className="booking-actions">
-                      <button className="btn-accept" onClick={() => handleBookingStep(completeBooking, booking.id, 'Return confirmed, rental completed ✅')}>✅ Mark Returned</button>
+                      <button className="btn-accept" onClick={() => handleBookingStep(completeBooking, booking.id, 'Return confirmed, rental fee charged ✅')}>✅ Mark Returned</button>
+                      <button className="btn-reject" onClick={() => window.confirm('Report damage? The renter will also be charged the full deposit.') && handleBookingStep((id) => completeBooking(id, true), booking.id, 'Damage reported, deposit charged')}>⚠️ Report Damage</button>
                     </div>
                   )}
                 </div>

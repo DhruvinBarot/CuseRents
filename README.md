@@ -151,22 +151,31 @@ REACT_APP_API_URL=http://127.0.0.1:8000
 | `POST` | `/api/bookings/bookings/`                    | Request a booking                   |
 | `POST` | `/api/bookings/bookings/{id}/accept/`        | Owner accepts (also `reject`)       |
 | `POST` | `/api/bookings/bookings/{id}/activate/`      | Pickup confirmed                    |
-| `POST` | `/api/bookings/bookings/{id}/complete/`      | Return confirmed, rewards credited  |
+| `POST` | `/api/bookings/bookings/{id}/complete/`      | Return confirmed, captures payment (`damage_reported` also captures deposit) |
+| `POST` | `/api/payments/create-intent/`               | `{booking_id}` → Stripe client secret |
+| `POST` | `/api/payments/confirm/`                     | `{booking_id}` re-checks payment with Stripe |
+| `POST` | `/api/payments/webhook/`                     | Stripe webhook (signature verified) |
+| `POST` | `/api/payments/connect/onboard/`             | Owner payout onboarding link        |
+| `GET`  | `/api/payments/connect/status/`              | Owner payout status                 |
 
 Run backend tests: `python manage.py test`
 
 ---
 
-## 🔬 Testing Stripe (Sandbox)
+## 🔬 Stripe Setup (test mode)
 
-Use Stripe test credentials:
+Payments use **Stripe Connect** (Express accounts, destination charges):
+the renter's card is authorized at booking, the rental fee is captured when the owner marks the item returned
+(the deposit hold is released, or captured if damage is reported), and Stripe pays the owner minus `PLATFORM_FEE_PERCENT`.
 
-```
-4242 4242 4242 4242
-Exp: any future date
-CVC: any 3 digits
-ZIP: any 5 digits
-```
+1. In the Stripe dashboard (test mode): enable **Connect** and copy your API keys
+2. Backend `CuseRents-backend/.env`: `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`
+3. Frontend `cuserents-frontend/.env`: `REACT_APP_STRIPE_PUBLISHABLE_KEY` (restart `npm start` after editing)
+4. Webhooks locally: `stripe listen --forward-to localhost:8000/api/payments/webhook/` and put the printed `whsec_...` in `STRIPE_WEBHOOK_SECRET`
+5. As an owner: Profile → **Set Up Payouts with Stripe** (in test mode use Stripe's test data, e.g. SSN `000-00-0000`, routing `110000000`, account `000123456789`)
+6. As a renter: book with card `4242 4242 4242 4242`, any future date, any CVC/ZIP
+
+Rentals must end within 6 days of booking (card authorizations expire after 7).
 
 ---
 

@@ -27,23 +27,25 @@ Each phase ends with a working app, a quick manual test, and a push to GitHub.
 - Moved to Phase 3: item photo upload (the UI shows category icons, never `photo_url`, so upload needs a display change too)
 - Known: without `GOOGLE_MAPS_API_KEY` addresses aren't geocoded; the list form falls back to downtown Syracuse coordinates
 
-## Phase 2: Stripe payments (the real thing)
-Payments today are **fake**: `PaymentForm.jsx` sleeps for 800 ms and calls it paid. The backend endpoint trusts whatever amount the client sends and doesn't require login.
-- [ ] Backend: `Payment` model (booking, intent id, type rental/deposit, amount, status)
-- [ ] `POST /api/payments/create-intent/` takes a **booking_id**, computes the amount server-side, requires auth, uses `settings.STRIPE_SECRET_KEY`
-- [ ] New flow: create booking (`pending_payment`) → create PaymentIntent → `stripe.confirmCardPayment` in the frontend → webhook marks the booking paid
-- [ ] Deposit as a separate PaymentIntent with `capture_method=manual` (a hold). Release it on complete, capture it on damage. **Limit:** card holds expire after about 7 days, so longer rentals need a different approach
-- [ ] `POST /api/payments/webhook/` with signature verification (`STRIPE_WEBHOOK_SECRET`), events `payment_intent.succeeded` / `payment_failed` / `canceled`
-- [ ] Refund on cancel/reject; auto-cancel the hold if the owner rejects
-- [ ] Test with the Stripe CLI (`stripe listen --forward-to localhost:8000/api/payments/webhook/`) and test cards
-- [ ] **Decision needed: owner payouts.** Paying owners real money requires Stripe Connect (Express accounts, onboarding, `transfer_data`). Without it, the owner's "wallet balance" is just a number and you pay owners by hand
+## Phase 2: Stripe payments with Connect
+- [x] Owners onboard to Stripe Connect Express (Profile → Set Up Payouts); `User.stripe_account_id`
+- [x] Booking starts as `awaiting_payment`; hidden from the owner until the card is authorized
+- [x] One PaymentIntent per booking: rental + deposit, `capture_method=manual`, destination charge to the owner, platform fee on the rental (`PLATFORM_FEE_PERCENT`, default 10)
+- [x] Amount computed server-side from the booking; only the booking's renter can pay; status re-checked with Stripe, never trusted from the browser
+- [x] Owner reject → authorization cancelled; return → rental captured, deposit released; damage → rental + deposit captured; failed capture leaves the booking active
+- [x] Webhook with signature verification as backup for confirm
+- [x] Rentals limited to end within 6 days (authorization lifetime)
+- [x] Owner wallet no longer credited with fake balance (real money goes through Stripe)
+- [x] Tests with Stripe mocked (`python manage.py test`)
+- [ ] **You:** end-to-end run in test mode with real test keys + `stripe listen`
+- Known: unpaid bookings don't hold the time slot (two renters could race); renter can't cancel their own booking yet (Phase 3)
 
 ## Phase 3: Finish the half-built features
 - [ ] Item photos: upload to Cloudinary and show them on cards/detail
 - [ ] Reviews API (the model exists, `urls.py` is empty) and UI on item detail
 - [ ] Rewards/wallet API (the model exists, no endpoints) and the profile display
 - [ ] Booking emails (request, accepted, reminder) via a real SMTP provider
-- [ ] Basic backend tests for booking + payment + webhook
+- [ ] Renter cancels own booking (release the authorization)
 
 ## Phase 4: Production hardening
 - [ ] `DEBUG=False`, real `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, secure cookies, HTTPS redirect

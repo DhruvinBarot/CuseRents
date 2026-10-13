@@ -14,6 +14,7 @@ class Booking(models.Model):
     Rental bookings for items or bundles
     """
     STATUS_CHOICES = [
+        ('awaiting_payment', 'Awaiting Payment'),
         ('pending', 'Pending Approval'),
         ('accepted', 'Accepted'),
         ('active', 'Active (In Progress)'),

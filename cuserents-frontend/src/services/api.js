@@ -238,14 +238,35 @@ export const activateBooking = async (bookingId) => {
   }
 };
 
-export const completeBooking = async (bookingId) => {
+export const completeBooking = async (bookingId, damageReported = false) => {
   try {
-    const response = await api.post(`/bookings/bookings/${bookingId}/complete/`);
+    const response = await api.post(`/bookings/bookings/${bookingId}/complete/`, { damage_reported: damageReported });
     return response.data;
   } catch (error) {
     console.error('Error completing booking:', error);
     throw error;
   }
+};
+
+// Payments API (Stripe Connect)
+export const createPaymentIntent = async (bookingId) => {
+  const response = await api.post('/payments/create-intent/', { booking_id: bookingId });
+  return response.data;
+};
+
+export const confirmPayment = async (bookingId) => {
+  const response = await api.post('/payments/confirm/', { booking_id: bookingId });
+  return response.data;
+};
+
+export const startPayoutOnboarding = async () => {
+  const response = await api.post('/payments/connect/onboard/');
+  return response.data;
+};
+
+export const getPayoutStatus = async () => {
+  const response = await api.get('/payments/connect/status/');
+  return response.data;
 };
 
 export default api;
