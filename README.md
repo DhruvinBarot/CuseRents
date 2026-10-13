@@ -168,7 +168,7 @@ Run backend tests: `python manage.py test`
 
 ## 🔬 Stripe Setup (test mode)
 
-Payments use **Stripe Connect** (Express accounts, destination charges):
+Payments use **Stripe Connect** (Accounts v2 with a full Stripe dashboard, Stripe-managed fees and losses; destination charges):
 the renter's card is authorized at booking, the rental fee is captured when the owner marks the item returned
 (the deposit hold is released, or captured if damage is reported), and Stripe pays the owner minus `PLATFORM_FEE_PERCENT`.
 

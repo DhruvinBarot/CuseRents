@@ -94,3 +94,27 @@ class PaymentTests(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.booking.refresh_from_db()
         self.assertEqual(self.booking.status, 'pending')
+
+    def test_onboarding_creates_v2_account_then_link(self):
+        from unittest.mock import MagicMock
+        self.stripe.AccountLink.create.return_value = SimpleNamespace(url='https://connect.stripe.com/setup/x')
+        fake = MagicMock(status_code=200, content=b'{}')
+        fake.json.return_value = {'id': 'acct_new'}
+        self.client.force_authenticate(self.renter)
+        with patch('payments.stripe_ops.requests.post', return_value=fake) as post:
+            res = self.client.post('/api/payments/connect/onboard/')
+        self.assertEqual(res.data, {'url': 'https://connect.stripe.com/setup/x'})
+        self.assertIn('/v2/core/accounts', post.call_args.args[0])
+        self.renter.refresh_from_db()
+        self.assertEqual(self.renter.stripe_account_id, 'acct_new')
+
+    def test_onboarding_surfaces_stripe_rejection(self):
+        from unittest.mock import MagicMock
+        fake = MagicMock(status_code=400, content=b'{}')
+        fake.json.return_value = {'error': {'message': 'nope'}}
+        self.client.force_authenticate(self.renter)
+        with patch('payments.stripe_ops.requests.post', return_value=fake):
+            res = self.client.post('/api/payments/connect/onboard/')
+        self.assertEqual((res.status_code, res.data['error']), (502, 'nope'))
+        self.renter.refresh_from_db()
+        self.assertEqual(self.renter.stripe_account_id, '')

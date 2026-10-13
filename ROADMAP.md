@@ -28,7 +28,7 @@ Each phase ends with a working app, a quick manual test, and a push to GitHub.
 - Known: without `GOOGLE_MAPS_API_KEY` addresses aren't geocoded; the list form falls back to downtown Syracuse coordinates
 
 ## Phase 2: Stripe payments with Connect
-- [x] Owners onboard to Stripe Connect Express (Profile → Set Up Payouts); `User.stripe_account_id`
+- [x] Owners onboard to Stripe Connect (Profile → Set Up Payouts); accounts created via Accounts v2 because Stripe rejects v1 `type=express` for new platforms
 - [x] Booking starts as `awaiting_payment`; hidden from the owner until the card is authorized
 - [x] One PaymentIntent per booking: rental + deposit, `capture_method=manual`, destination charge to the owner, platform fee on the rental (`PLATFORM_FEE_PERCENT`, default 10)
 - [x] Amount computed server-side from the booking; only the booking's renter can pay; status re-checked with Stripe, never trusted from the browser

@@ -8,8 +8,11 @@ Stripe Connect money flow (destination charges, one PaymentIntent per booking):
 The platform fee is taken from the rental via application_fee_amount.
 """
 from decimal import Decimal
+import requests
 import stripe
 from django.conf import settings
+
+STRIPE_V2_VERSION = '2026-09-30.endive'
 
 
 class PaymentError(Exception):
@@ -86,14 +89,35 @@ def capture(booking, include_deposit=False):
     return _client().PaymentIntent.capture(booking.stripe_payment_id, amount_to_capture=amount)
 
 
+def _create_connected_account(email):
+    """Stripe rejects v1 Account.create for new platforms; only Accounts v2 with a full dashboard
+    and Stripe-managed fees/losses is allowed. The resulting acct_ id works with v1 AccountLink/Account.retrieve."""
+    # shortcut: stripe-python 8.x has no Accounts v2 client, so raw HTTP; switch to the SDK after upgrading stripe
+    res = requests.post(
+        'https://api.stripe.com/v2/core/accounts',
+        headers={'Authorization': f'Bearer {settings.STRIPE_SECRET_KEY}', 'Stripe-Version': STRIPE_V2_VERSION},
+        json={
+            'contact_email': email,
+            'identity': {'country': 'US'},
+            'dashboard': 'full',
+            'defaults': {'responsibilities': {'fees_collector': 'stripe', 'losses_collector': 'stripe'}},
+            'configuration': {
+                'merchant': {'capabilities': {'card_payments': {'requested': True}}},
+                'recipient': {'capabilities': {'stripe_balance': {'stripe_transfers': {'requested': True}}}},
+            },
+        },
+        timeout=20,
+    )
+    if res.status_code != 200:
+        error = res.json().get('error', {}) if res.content else {}
+        raise PaymentError(error.get('user_message') or error.get('message') or 'Could not create payout account')
+    return res.json()['id']
+
+
 def onboarding_link(user):
     s = _client()
     if not user.stripe_account_id:
-        account = s.Account.create(
-            type='express', email=user.email,
-            capabilities={'card_payments': {'requested': True}, 'transfers': {'requested': True}},
-        )
-        user.stripe_account_id = account.id
+        user.stripe_account_id = _create_connected_account(user.email)
         user.save(update_fields=['stripe_account_id'])
     link = s.AccountLink.create(
         account=user.stripe_account_id, type='account_onboarding',

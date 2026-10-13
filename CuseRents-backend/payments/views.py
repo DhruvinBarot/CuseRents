@@ -1,3 +1,4 @@
+import requests
 import stripe
 from django.conf import settings
 from rest_framework import status
@@ -71,6 +72,9 @@ class ConnectOnboardView(APIView):
     def post(self, request):
         try:
             return Response({'url': stripe_ops.onboarding_link(request.user)})
+        except (stripe_ops.PaymentError, requests.RequestException) as e:
+            return Response({'error': str(e) if isinstance(e, stripe_ops.PaymentError) else 'Could not reach Stripe'},
+                            status=status.HTTP_502_BAD_GATEWAY)
         except stripe.error.StripeError as e:
             return Response({'error': e.user_message or 'Could not start payout setup'}, status=status.HTTP_502_BAD_GATEWAY)
 
