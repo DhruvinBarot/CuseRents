@@ -34,12 +34,6 @@ class ItemViewSet(viewsets.ModelViewSet):
             return ItemCreateUpdateSerializer
         return ItemDetailSerializer
     
-    def get_permissions(self):
-        """Set permissions based on action"""
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsAuthenticated()]
-        return [AllowAny()]
-    
     def perform_create(self, serializer):
         """Set owner to current user when creating item"""
         serializer.save(owner=self.request.user)
@@ -203,6 +197,34 @@ class ItemViewSet(viewsets.ModelViewSet):
             ]
         })
     
+    @action(detail=False, methods=['post'], url_path='upload-photo', permission_classes=[IsAuthenticated])
+    def upload_photo(self, request):
+        """Upload an item photo to Cloudinary, returns {'url': ...} to save as photo_url"""
+        import cloudinary
+        import cloudinary.uploader
+        from django.conf import settings
+        photo = request.FILES.get('photo')
+        if not photo or not (photo.content_type or '').startswith('image/'):
+            return Response({'error': 'Please choose an image file'}, status=status.HTTP_400_BAD_REQUEST)
+        if photo.size > 5 * 1024 * 1024:
+            return Response({'error': 'Image must be under 5 MB'}, status=status.HTTP_400_BAD_REQUEST)
+        creds = settings.CLOUDINARY_STORAGE
+        if not creds['CLOUD_NAME']:
+            return Response({'error': 'Photo uploads are not configured'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        cloudinary.config(cloud_name=creds['CLOUD_NAME'], api_key=creds['API_KEY'],
+                          api_secret=creds['API_SECRET'], secure=True)
+        try:
+            result = cloudinary.uploader.upload(photo, folder='cuserents/items', resource_type='image')
+        except Exception:
+            return Response({'error': 'Upload failed, try another image'}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response({'url': result['secure_url']})
+
+    def get_permissions(self):
+        """Set permissions based on action"""
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'upload_photo']:
+            return [IsAuthenticated()]
+        return [AllowAny()]
+
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """Platform-wide numbers for the home page"""

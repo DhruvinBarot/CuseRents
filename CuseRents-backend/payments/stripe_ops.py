@@ -66,6 +66,8 @@ def sync_from_intent(intent):
     if intent.status == 'requires_capture' and booking.status == 'awaiting_payment':
         booking.status = 'pending'  # card authorized, now waiting for owner approval
         booking.save(update_fields=['status', 'updated_at'])
+        from bookings.emails import notify
+        notify(booking, 'requested')
     elif intent.status == 'canceled' and booking.status in ('awaiting_payment', 'pending', 'accepted'):
         booking.status = 'cancelled'
         booking.save(update_fields=['status', 'updated_at'])

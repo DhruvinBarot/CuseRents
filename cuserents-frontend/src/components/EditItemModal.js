@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { updateItem } from '../services/api';
 import { X, Save } from 'lucide-react';
+import PhotoInput from './PhotoInput';
 
 const EditItemModal = ({ item, onClose, onSuccess, categories }) => {
   const [formData, setFormData] = useState({
@@ -171,6 +172,8 @@ const EditItemModal = ({ item, onClose, onSuccess, categories }) => {
               />
             </div>
           </div>
+
+          <PhotoInput value={formData.photo_url} onChange={(url) => setFormData((f) => ({ ...f, photo_url: url }))} />
 
           <div className="form-group">
             <label>Location</label>

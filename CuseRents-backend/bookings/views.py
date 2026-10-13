@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
 from .models import Booking
 from payments import stripe_ops
+from .emails import notify
 import stripe
 from .serializers import (
     BookingListSerializer,
@@ -68,6 +69,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         # Accept booking
         booking.status = 'accepted'
         booking.save()
+        notify(booking, 'accepted')
         
         serializer = self.get_serializer(booking)
         return Response({
@@ -101,10 +103,30 @@ class BookingViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Could not release the payment hold, try again'}, status=status.HTTP_502_BAD_GATEWAY)
         booking.status = 'cancelled'
         booking.save()
+        notify(booking, 'rejected')
         
         return Response({
             'message': 'Booking rejected'
         })
+    
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Renter cancels before pickup; the card authorization is released"""
+        booking = self.get_object()
+        if booking.renter != request.user:
+            return Response({'error': 'Only the renter can cancel this booking'}, status=status.HTTP_403_FORBIDDEN)
+        if booking.status not in ('awaiting_payment', 'pending', 'accepted'):
+            return Response({'error': f'Cannot cancel booking with status: {booking.status}'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            stripe_ops.release(booking)
+        except stripe.error.StripeError:
+            return Response({'error': 'Could not release the payment hold, try again'}, status=status.HTTP_502_BAD_GATEWAY)
+        was_visible_to_owner = booking.status != 'awaiting_payment'
+        booking.status = 'cancelled'
+        booking.save()
+        if was_visible_to_owner:
+            notify(booking, 'cancelled')
+        return Response({'message': 'Booking cancelled'})
     
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
@@ -150,6 +172,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         # Update CO2 saved
         booking.renter.add_co2_saved(booking.item.carbon_offset_kg)
+        notify(booking, 'completed')
         
         serializer = self.get_serializer(booking)
         return Response({

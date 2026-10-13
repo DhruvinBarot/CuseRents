@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { searchItems, createItem, getMyItems, getStats, activateBooking, completeBooking, startPayoutOnboarding, getPayoutStatus } from './services/api';
+import { searchItems, createItem, getMyItems, getStats, activateBooking, completeBooking, startPayoutOnboarding, getPayoutStatus, cancelBooking, getItemReviews } from './services/api';
 import { useAuth } from './context/AuthContext';
 import AuthModal from './components/AuthModal';
 import EditItemModal from './components/EditItemModal';
 import PaymentForm from './components/PaymentForm';
+import PhotoInput from './components/PhotoInput';
+import ReviewForm from './components/ReviewForm';
 import { 
   Home, Search, PlusCircle, User, MapPin, 
   DollarSign, Package, Wrench, Camera, 
@@ -24,7 +26,7 @@ function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [stats, setStats] = useState(null);
   
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, checkAuth } = useAuth();
 
   const categories = [
     { id: 'tools', name: 'Tools', icon: Wrench, color: '#F76900' },
@@ -205,7 +207,7 @@ function App() {
               return (
                 <div key={item.id} className="item-tile">
                   <div className="item-icon-wrapper">
-                    <CategoryIcon size={48} color="#F76900" />
+                    {item.photo_url ? <img src={item.photo_url} alt={item.title} className="item-photo" /> : <CategoryIcon size={48} color="#F76900" />}
                   </div>
                   <div className="item-info">
                     <h3 className="item-name">{item.title}</h3>
@@ -238,6 +240,11 @@ function App() {
   const ItemDetailView = () => {
     const [startDate, setStartDate] = useState('');
     const [hours, setHours] = useState(1);
+
+    const [reviews, setReviews] = useState([]);
+    useEffect(() => {
+      if (selectedItem) getItemReviews(selectedItem.id).then(setReviews).catch(() => setReviews([]));
+    }, []);
 
     if (!selectedItem) return null;
 
@@ -283,7 +290,7 @@ function App() {
         <div className="detail-container">
           <div className="detail-header">
             <div className="detail-icon-wrapper">
-              <CategoryIcon size={80} color="#F76900" />
+              {selectedItem.photo_url ? <img src={selectedItem.photo_url} alt={selectedItem.title} className="item-photo" /> : <CategoryIcon size={80} color="#F76900" />}
             </div>
             <div className="detail-header-info">
               <h1>{selectedItem.title}</h1>
@@ -319,6 +326,16 @@ function App() {
                   <span>Security Deposit:</span>
                   <span className="price-value">${depositAmount.toFixed(2)}</span>
                 </div>
+              </div>
+
+              <div style={{marginTop: '25px'}}>
+                <h3>Reviews ({reviews.length})</h3>
+                {reviews.length === 0 ? <p className="empty-state">No reviews yet</p> : reviews.map((r) => (
+                  <div key={r.id} className="review-row">
+                    <strong>{'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}</strong> <span>{r.reviewer_username}</span>
+                    {r.text && <p>{r.text}</p>}
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -621,7 +638,7 @@ function App() {
           address_text: formData.address_text,
           lat: parseFloat(formData.lat) || 43.0481,
           lng: parseFloat(formData.lng) || -76.1474,
-          photo_url: formData.photo_url || 'https://via.placeholder.com/400?text=No+Image',
+          photo_url: formData.photo_url,
           carbon_offset_kg: parseInt(formData.carbon_offset_kg) || 5,
           is_available: true
         };
@@ -696,6 +713,9 @@ function App() {
             </div>
           </div>
           <div className="form-group">
+            <PhotoInput value={formData.photo_url} onChange={(url) => setFormData((f) => ({ ...f, photo_url: url }))} />
+          </div>
+          <div className="form-group">
             <label>Location</label>
             <input type="text" name="address_text" value={formData.address_text} onChange={handleChange} placeholder="e.g., 100 Winding Ridge Rd, Syracuse, NY" className="form-input" required />
           </div>
@@ -741,6 +761,7 @@ function App() {
       if (isAuthenticated && currentView === 'profile') {
         fetchMyItems();
         fetchMyBookings();
+        checkAuth();  // refresh points/CO2 after completed rentals
         getPayoutStatus().then(setPayouts).catch((err) => console.error('Error fetching payout status:', err));
       }
     }, [isAuthenticated, currentView]);
@@ -871,7 +892,7 @@ function App() {
             </div>
           </div>
           <div className="wallet-balance">
-            <p>Wallet Balance: <strong>${user?.wallet_balance || '0.00'}</strong></p>
+            <p>Rewards tier: <strong>{user?.wallet_tier || 'Starter'}</strong></p>
           </div>
         </div>
 
@@ -926,6 +947,9 @@ function App() {
                       <button className="btn-reject" onClick={() => window.confirm('Report damage? The renter will also be charged the full deposit.') && handleBookingStep((id) => completeBooking(id, true), booking.id, 'Damage reported, deposit charged')}>⚠️ Report Damage</button>
                     </div>
                   )}
+                  {booking.status === 'completed' && !booking.reviewed_by_me && (
+                    <div className="booking-actions"><ReviewForm bookingId={booking.id} label="Review Renter" onDone={fetchMyBookings} /></div>
+                  )}
                 </div>
               ))}
             </div>
@@ -954,6 +978,14 @@ function App() {
                     <div className="booking-actions">
                       <button className="btn-accept" onClick={() => handleBookingStep(activateBooking, booking.id, 'Pickup confirmed, rental started')}>📦 Mark Picked Up</button>
                     </div>
+                  )}
+                  {['awaiting_payment', 'pending', 'accepted'].includes(booking.status) && (
+                    <div className="booking-actions">
+                      <button className="btn-reject" onClick={() => window.confirm('Cancel this booking? Your card hold will be released.') && handleBookingStep(cancelBooking, booking.id, 'Booking cancelled')}>Cancel Booking</button>
+                    </div>
+                  )}
+                  {booking.status === 'completed' && !booking.reviewed_by_me && (
+                    <div className="booking-actions"><ReviewForm bookingId={booking.id} label="Review Item" onDone={fetchMyBookings} /></div>
                   )}
                 </div>
               ))}

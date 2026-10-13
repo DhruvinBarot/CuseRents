@@ -29,6 +29,7 @@ class BookingListSerializer(serializers.ModelSerializer):
     item = BookingItemSerializer(read_only=True)
     renter = BookingRenterSerializer(read_only=True)
     owner = serializers.SerializerMethodField()
+    reviewed_by_me = serializers.SerializerMethodField()
     
     class Meta:
         model = Booking
@@ -36,9 +37,13 @@ class BookingListSerializer(serializers.ModelSerializer):
             'id', 'booking_code', 'item', 'renter', 'owner',
             'start_time', 'end_time',
             'total_price', 'deposit_amount', 'wallet_credit_used',
-            'reward_points_earned', 'status',
+            'reward_points_earned', 'status', 'reviewed_by_me',
             'created_at', 'updated_at'
         ]
+    
+    def get_reviewed_by_me(self, obj):
+        request = self.context.get('request')
+        return bool(request) and obj.reviews.filter(reviewer=request.user).exists()
     
     def get_owner(self, obj):
         """Get item owner info"""

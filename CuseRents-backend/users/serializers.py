@@ -100,6 +100,7 @@ class UserSerializer(serializers.ModelSerializer):
     """
     wallet_balance = serializers.SerializerMethodField()
     wallet_points = serializers.SerializerMethodField()
+    wallet_tier = serializers.CharField(source='wallet.tier_level', read_only=True, default='Starter')
     
     class Meta:
         model = User
@@ -108,7 +109,7 @@ class UserSerializer(serializers.ModelSerializer):
             'phone', 'lat', 'lng', 'address_text',
             'rating_avg', 'total_ratings', 'co2_saved_kg',
             'profile_photo', 'bio', 'verification_level',
-            'wallet_balance', 'wallet_points', 'created_at'
+            'wallet_balance', 'wallet_points', 'wallet_tier', 'created_at'
         ]
         read_only_fields = ['rating_avg', 'total_ratings', 'co2_saved_kg', 'verification_level']
     

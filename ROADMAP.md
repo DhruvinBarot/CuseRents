@@ -41,11 +41,15 @@ Each phase ends with a working app, a quick manual test, and a push to GitHub.
 - Known: unpaid bookings don't hold the time slot (two renters could race); renter can't cancel their own booking yet (Phase 3)
 
 ## Phase 3: Finish the half-built features
-- [ ] Item photos: upload to Cloudinary and show them on cards/detail
-- [ ] Reviews API (the model exists, `urls.py` is empty) and UI on item detail
-- [ ] Rewards/wallet API (the model exists, no endpoints) and the profile display
-- [ ] Booking emails (request, accepted, reminder) via a real SMTP provider
-- [ ] Renter cancels own booking (release the authorization)
+- [x] Item photos: upload to Cloudinary (`/api/items/items/upload-photo/`, images only, 5 MB max), shown on cards and detail; dead placeholder URLs cleared
+- [x] Reviews API (`/api/reviews/`): renter reviews item + owner, owner reviews renter, completed rentals only, once each, +50 points; shown on item detail
+- [x] Fix review ratings being counted again on every save
+- [x] Renter can cancel before pickup (card hold released, owner emailed)
+- [x] Booking emails: new request (owner), accepted / declined / receipt (renter), cancelled (owner). Never block the booking action if mail fails
+- [x] Profile shows rewards tier; points/CO2 refresh on profile open
+- [x] Tests (`python manage.py test`, 15 total)
+- Skipped: points redemption (wallet credit can't be spent at checkout yet), reminder emails (need a scheduler), video reviews
+- **You:** set `CLOUDINARY_*` in `.env` for photo uploads; real SMTP settings come with deploy (Phase 5)
 
 ## Phase 4: Production hardening
 - [ ] `DEBUG=False`, real `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, secure cookies, HTTPS redirect

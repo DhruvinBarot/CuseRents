@@ -146,11 +146,15 @@ REACT_APP_API_URL=http://127.0.0.1:8000
 | `GET`  | `/api/items/items/search/?lat=&lng=&radius=` | Items near a location               |
 | `GET`  | `/api/items/items/?mine=true`                | Your own listings                   |
 | `GET`  | `/api/items/items/stats/`                    | Home page stats                     |
+| `POST` | `/api/items/items/upload-photo/`             | Multipart `photo` → Cloudinary URL  |
+| `GET`  | `/api/reviews/?item={id}`                    | Item reviews                        |
+| `POST` | `/api/reviews/`                              | `{booking_id, stars, text}`         |
 | `POST` | `/api/items/items/`                          | List a new item                     |
 | `GET`  | `/api/bookings/bookings/`                    | Your bookings (as renter or owner)  |
 | `POST` | `/api/bookings/bookings/`                    | Request a booking                   |
 | `POST` | `/api/bookings/bookings/{id}/accept/`        | Owner accepts (also `reject`)       |
 | `POST` | `/api/bookings/bookings/{id}/activate/`      | Pickup confirmed                    |
+| `POST` | `/api/bookings/bookings/{id}/cancel/`        | Renter cancels, hold released       |
 | `POST` | `/api/bookings/bookings/{id}/complete/`      | Return confirmed, captures payment (`damage_reported` also captures deposit) |
 | `POST` | `/api/payments/create-intent/`               | `{booking_id}` → Stripe client secret |
 | `POST` | `/api/payments/confirm/`                     | `{booking_id}` re-checks payment with Stripe |

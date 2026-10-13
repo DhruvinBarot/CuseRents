@@ -248,6 +248,32 @@ export const completeBooking = async (bookingId, damageReported = false) => {
   }
 };
 
+export const cancelBooking = async (bookingId) => {
+  const response = await api.post(`/bookings/bookings/${bookingId}/cancel/`);
+  return response.data;
+};
+
+export const uploadItemPhoto = async (file) => {
+  const form = new FormData();
+  form.append('photo', file);
+  // The instance defaults to JSON, which would make axios serialize the FormData
+  const response = await api.post('/items/items/upload-photo/', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data.url;
+};
+
+// Reviews API
+export const getItemReviews = async (itemId) => {
+  const response = await api.get('/reviews/', { params: { item: itemId } });
+  return response.data.results || [];
+};
+
+export const createReview = async (bookingId, stars, text) => {
+  const response = await api.post('/reviews/', { booking_id: bookingId, stars, text });
+  return response.data;
+};
+
 // Payments API (Stripe Connect)
 export const createPaymentIntent = async (bookingId) => {
   const response = await api.post('/payments/create-intent/', { booking_id: bookingId });

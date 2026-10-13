@@ -1525,3 +1525,10 @@ body {
     text-align: center;
   }
 }
+/* Item photos, uploads, reviews */
+.item-photo { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.photo-preview { display: block; max-width: 200px; max-height: 150px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; }
+.photo-hint { font-size: 0.85rem; color: var(--text-gray); margin-top: 4px; }
+.review-row { padding: 10px 0; border-bottom: 1px solid #eee; }
+.review-row strong { color: #F76900; margin-right: 6px; }
+.review-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }

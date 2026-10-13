@@ -114,7 +114,10 @@ class Review(models.Model):
         self.save(update_fields=['helpful_count'])
     
     def save(self, *args, **kwargs):
+        is_new = self._state.adding
         super().save(*args, **kwargs)
+        if not is_new:
+            return  # ratings are running averages, only count a review once
         
         # Update item rating if this is an item review
         if self.item:

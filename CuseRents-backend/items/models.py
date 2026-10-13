@@ -83,6 +83,7 @@ class Item(models.Model):
     
     # Media
     photo_url = models.URLField(
+        blank=True,
         help_text="Cloudinary URL for main photo"
     )
     additional_photos = models.JSONField(
