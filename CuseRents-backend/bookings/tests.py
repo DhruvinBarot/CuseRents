@@ -49,6 +49,9 @@ class BookingFlowTest(APITestCase):
         self.assertEqual(res.status_code, 201, res.data)
         mine = self.client.get('/api/items/items/', {'mine': 'true'}).data['results']
         self.assertEqual([i['title'] for i in mine], ['Drill'])
+        self.client.credentials()
+        self.assertEqual(self.client.get('/api/items/items/', {'mine': 'true'}).data['results'], [])
+        self.as_user(owner)
         item_id = mine[0]['id']
 
         self.as_user(renter)

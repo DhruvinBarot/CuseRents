@@ -26,7 +26,7 @@ function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [stats, setStats] = useState(null);
   
-  const { user, isAuthenticated, logout, checkAuth } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
 
   const categories = [
     { id: 'tools', name: 'Tools', icon: Wrench, color: '#F76900' },
@@ -761,7 +761,6 @@ function App() {
       if (isAuthenticated && currentView === 'profile') {
         fetchMyItems();
         fetchMyBookings();
-        checkAuth();  // refresh points/CO2 after completed rentals
         getPayoutStatus().then(setPayouts).catch((err) => console.error('Error fetching payout status:', err));
       }
     }, [isAuthenticated, currentView]);

@@ -22,8 +22,9 @@ class ItemViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Get items queryset (?mine=true limits to the current user's items)"""
         queryset = Item.objects.select_related('owner').prefetch_related('videos')
-        if self.request.query_params.get('mine') == 'true' and self.request.user.is_authenticated:
-            queryset = queryset.filter(owner=self.request.user)
+        if self.request.query_params.get('mine') == 'true':
+            # Anonymous users own nothing; never fall through to every item
+            queryset = queryset.filter(owner=self.request.user) if self.request.user.is_authenticated else queryset.none()
         return queryset
     
     def get_serializer_class(self):

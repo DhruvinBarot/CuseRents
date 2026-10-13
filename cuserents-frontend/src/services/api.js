@@ -23,7 +23,9 @@ api.interceptors.request.use(
   }
 );
 
-// On 401, swap the refresh token for a new access token once and retry
+// On 401, swap the refresh token for a new access token once and retry.
+// Refresh tokens are single-use (rotation), so concurrent 401s must share one refresh call.
+let refreshing = null;
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -34,14 +36,18 @@ api.interceptors.response.use(
     }
     original._retried = true;
     try {
-      const { data } = await axios.post(`${API_BASE_URL}/token/refresh/`, { refresh });
+      refreshing = refreshing || axios.post(`${API_BASE_URL}/token/refresh/`, { refresh })
+        .finally(() => { refreshing = null; });
+      const { data } = await refreshing;
       localStorage.setItem('access_token', data.access);
       if (data.refresh) localStorage.setItem('refresh_token', data.refresh);
       original.headers.Authorization = `Bearer ${data.access}`;
       return api(original);
     } catch (refreshError) {
+      // Session is really over: clear it and reload so the UI shows the logged-out state
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
+      window.location.reload();
       return Promise.reject(error);
     }
   }
