@@ -65,10 +65,33 @@ Each phase ends with a working app, a quick manual test, and a push to GitHub.
 - Postgres: already supported via `DATABASE_URL` (psycopg2 installed); set up in Phase 5
 - Note: old copies of `db.sqlite3` (demo data only, from before testing) remain in git history
 
-## Phase 5: Deploy
+## Phase 5: Deploy ✅ (live in Stripe test mode)
 - [x] `render.yaml` Blueprint (API + free Postgres), `build.sh` (install, collectstatic, migrate, first admin from env), Python 3.13 pin
 - [x] Backend trusts its own Render hostname automatically (`RENDER_EXTERNAL_HOSTNAME`)
 - [x] `DEPLOY.md`: step-by-step Render + Vercel + Stripe webhook
-- [ ] **You:** create Render + Vercel accounts and follow `DEPLOY.md`
-- [ ] Smoke test on the deployed URLs
-- [ ] Before real money: Terms review, SMTP, Stripe live keys + live webhook, paid Render plans, optional custom domain
+- [x] Fixed the clean-build failure Vercel caught (stale `currentView` reference + hook warnings)
+- [x] Backend live: https://cuserents-api.onrender.com
+- [x] Frontend live: https://cuse-rents.vercel.app (CORS + `FRONTEND_URL` pointed at it)
+- [x] Stripe test-mode webhook connected
+- [x] End-to-end test on the live site passed (payout setup, listing, booking, payment, return, review)
+
+## Before real users / real money
+- [ ] **Upgrade Render Postgres before it expires** (free DB is deleted ~30 days after creation, around 2026-11-13)
+- [ ] Upgrade the Render web service so it doesn't sleep after 15 min idle
+- [ ] Real email: SMTP provider + `EMAIL_*` settings in Render (emails only go to logs today)
+- [ ] Legal review of Terms/Privacy; replace placeholder `support@cuserents.com`
+- [ ] Stripe live mode: activate account, Connect platform profile/branding, live keys in Render + Vercel, live webhook, one real small booking + refund
+- [ ] Confirm the old Stripe test key exposed in git history was rolled
+
+## Soon
+- [ ] `GOOGLE_MAPS_API_KEY` so listings are geocoded from their address (now default to downtown Syracuse); search from the user's location instead of fixed SU coordinates
+- [ ] Cloudinary keys in Render for photo uploads
+- [ ] Custom domain (settings only): `cuserents.com` → Vercel, `api.cuserents.com` → Render, then update `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `REACT_APP_API_URL`, webhook URL
+- [ ] Error alerts (e.g. Sentry)
+
+## Known gaps (OK for launch)
+- Unpaid bookings don't hold the time slot (two renters could race to pay)
+- Rentals must end within 6 days (card authorizations expire after 7)
+- No points redemption, no reminder emails, no in-app earnings history (owners use their Stripe dashboard)
+
+## Next: frontend + listings work (details from you)
