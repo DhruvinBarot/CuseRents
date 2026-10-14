@@ -26,6 +26,16 @@ const DEMO_PHOTOS = {
   'kitchenaid stand mixer': '/images/items/kitchenaid-mixer.webp',
 };
 const photoFor = (item) => DEMO_PHOTOS[item?.title?.trim().toLowerCase()] || item?.photo_url;
+// Hero examples shown until there are 3+ real listings with photos, so a new deployment never looks empty.
+// They link to a category, never to a fake listing or price.
+const CATEGORY_SLIDES = [
+  { key: 'kitchen-mixer', photo: '/images/items/kitchenaid-mixer.webp', category: 'kitchen', title: 'Stand mixers & baking gear' },
+  { key: 'tools-drill', photo: '/images/items/dewalt-drill-kit.webp', category: 'tools', title: 'Drills & power tools' },
+  { key: 'sports-scooter', photo: '/images/items/electric-scooter.webp', category: 'sports', title: 'Scooters & outdoor gear' },
+  { key: 'party-picnic', photo: '/images/items/picnic-kit.webp', category: 'party', title: 'Picnic & party kits' },
+  { key: 'kitchen-pot', photo: '/images/items/instant-pot.webp', category: 'kitchen', title: 'Instant Pots & small appliances' },
+];
+
 const ROADMAP = [
   { icon: MapIcon, status: 'Next up', title: 'Map search', text: 'See rentals on a live map and filter by walking distance from your dorm or apartment.' },
   { icon: Layers, status: 'In progress', title: 'Bundles', text: 'Move-in kits, tailgate kits and camping kits rented together at one bundle price.' },
@@ -101,9 +111,9 @@ function App() {
     });
   }, [items, searchQuery]);
 
-  // Hero slideshow: items with our demo photos first, else any item with a photo
-  const demoSlides = items.filter(i => DEMO_PHOTOS[i.title?.trim().toLowerCase()]);
-  const slides = demoSlides.length ? demoSlides : items.filter(i => i.photo_url).slice(0, 5);
+  // Hero slideshow: real listings with photos, else category examples
+  const itemSlides = items.filter(photoFor).map(i => ({ key: `item-${i.id}`, photo: photoFor(i), category: i.category, title: i.title, item: i }));
+  const slides = itemSlides.length >= 3 ? itemSlides.slice(0, 6) : CATEGORY_SLIDES;
   const [slideHover, setSlideHover] = useState(false);
 
   useEffect(() => {
@@ -165,8 +175,9 @@ function App() {
   // ==================== HOME VIEW ====================
   const featuredItems = items.slice(0, 8);
   const activeSlide = slides.length ? slide % slides.length : 0;
-  const showcase = slides[activeSlide] || items[0];
-  const ShowcaseIcon = categories.find(c => c.id === showcase?.category)?.icon || Package;
+  const showcase = slides[activeSlide];
+  const showcaseCategory = categories.find(c => c.id === showcase.category);
+  const ShowcaseIcon = showcaseCategory?.icon || Package;
 
   const HomeView = () => (
     <div className="home-view">
@@ -197,7 +208,6 @@ function App() {
           </div>
 
           <div className="hero-visual">
-            {showcase && (
               <div
                 className="showcase-card"
                 onMouseEnter={() => setSlideHover(true)}
@@ -207,22 +217,24 @@ function App() {
               >
                 <div className="product-media showcase-media">
                   <ShowcaseIcon size={64} aria-hidden="true" />
-                  {(slides.length ? slides : [showcase]).map((s, i) => photoFor(s) && (
-                    <img key={s.id} src={photoFor(s)} alt="" className={`item-photo ${i === activeSlide ? 'is-active' : ''}`} onError={(e) => { e.currentTarget.hidden = true; }} />
+                  {slides.map((s, i) => (
+                    <img key={s.key} src={s.photo} alt="" className={`item-photo ${i === activeSlide ? 'is-active' : ''}`} onError={(e) => { e.currentTarget.hidden = true; }} />
                   ))}
                 </div>
-                <div className="showcase-body" key={showcase.id} aria-live={slidesPaused ? 'polite' : 'off'}>
+                <div className="showcase-body" key={showcase.key} aria-live={slidesPaused ? 'polite' : 'off'}>
                   <div>
-                    <p className="product-dept">Popular near you</p>
+                    <p className="product-dept">{showcase.item ? 'Popular near you' : `Rent in ${showcaseCategory?.name}`}</p>
                     <h3>{showcase.title}</h3>
-                    <p className="product-price">${parseFloat(showcase.price_per_hour).toFixed(2)}<span>/hr</span></p>
+                    {showcase.item && <p className="product-price">${parseFloat(showcase.item.price_per_hour).toFixed(2)}<span>/hr</span></p>}
                   </div>
-                  <button className="btn btn-dark" onClick={() => handleViewDetails(showcase)}>View <ArrowRight size={18} aria-hidden="true" /></button>
+                  <button className="btn btn-dark" onClick={() => (showcase.item ? handleViewDetails(showcase.item) : goToCategory(showcase.category))}>
+                    {showcase.item ? 'View' : 'Browse'} <ArrowRight size={18} aria-hidden="true" />
+                  </button>
                 </div>
                 {slides.length > 1 && (
                   <div className="showcase-controls">
                     {slides.map((s, i) => (
-                      <button key={s.id} className={`slide-dot ${i === activeSlide ? 'active' : ''}`} onClick={() => setSlide(i)} aria-label={`Show ${s.title}`} aria-current={i === activeSlide} />
+                      <button key={s.key} className={`slide-dot ${i === activeSlide ? 'active' : ''}`} onClick={() => setSlide(i)} aria-label={`Show ${s.title}`} aria-current={i === activeSlide} />
                     ))}
                     <button className="slide-toggle" onClick={() => setSlidesPaused(p => !p)} aria-label={slidesPaused ? 'Play slideshow' : 'Pause slideshow'}>
                       {slidesPaused ? <Play size={16} /> : <Pause size={16} />}
@@ -230,7 +242,6 @@ function App() {
                   </div>
                 )}
               </div>
-            )}
             <p className="showcase-badge"><Lock size={16} aria-hidden="true" /> Card held, not charged</p>
             <dl className="showcase-stats">
               <div><dt>Items available</dt><dd>{stats ? stats.items_available : '–'}</dd></div>
@@ -239,6 +250,33 @@ function App() {
           </div>
         </div>
       </section>
+
+      <section className="band band-perk">
+        <div className="container">
+          <div className="founder-card">
+            <div>
+              <p className="founder-tag"><Gift size={16} aria-hidden="true" /> Founding member perk</p>
+              <h2>Join during the beta and get $5 on us.</h2>
+              <p>Create a free account now and we'll add $5 of rental credit to your wallet, plus first access to new features like map search.</p>
+            </div>
+            {isAuthenticated
+              ? <p className="founder-done"><CheckCircle size={20} aria-hidden="true" /> You're a founding member</p>
+              : <button className="btn btn-orange" onClick={() => setShowAuthModal(true)}>Claim my spot <ArrowRight size={18} aria-hidden="true" /></button>}
+          </div>
+        </div>
+      </section>
+
+      {featuredItems.length > 0 && (
+        <section className="band">
+          <div className="container">
+            <div className="section-head">
+              <h2 className="section-title">Popular near you</h2>
+              <button className="link-arrow" onClick={() => goToCategory('')}>See everything <ArrowRight size={18} aria-hidden="true" /></button>
+            </div>
+            <div className="items-grid">{featuredItems.map(ItemCard)}</div>
+          </div>
+        </section>
+      )}
 
       <section className="band band-line">
         <ul className="container value-strip">
@@ -267,22 +305,11 @@ function App() {
         </div>
       </section>
 
-      {featuredItems.length > 0 && (
-        <section className="band">
-          <div className="container">
-            <div className="section-head">
-              <h2 className="section-title">Popular near you</h2>
-              <button className="link-arrow" onClick={() => goToCategory('')}>See everything <ArrowRight size={18} aria-hidden="true" /></button>
-            </div>
-            <div className="items-grid">{featuredItems.map(ItemCard)}</div>
-          </div>
-        </section>
-      )}
 
       <section className="band band-sand">
         <div className="container split">
-          <h2 className="section-title">From students, for students</h2>
-          <p className="lede">Most of what we own sits unused most of the time. CuseRents lets the Syracuse community share it: renters save money, owners earn from things they already have, and fewer things get bought and thrown away.</p>
+          <h2 className="section-title">From students, for the neighborhood</h2>
+          <p className="lede">Built by Syracuse students for everyone around campus: students, families and neighbors. Most of what we own sits unused most of the time, so sharing it means renters save money, owners earn from things they already have, and fewer things get bought and thrown away.</p>
         </div>
         <ol className="container steps-grid">
           <li className="step-card"><span className="step-number">01</span><h3>Search</h3><p>Find what you need near campus.</p></li>
@@ -294,17 +321,6 @@ function App() {
 
       <section className="band">
         <div className="container">
-          <div className="founder-card">
-            <div>
-              <p className="founder-tag"><Gift size={16} aria-hidden="true" /> Founding member perk</p>
-              <h2>Join during the beta and get $5 on us.</h2>
-              <p>Create a free account now and we'll add $5 of rental credit to your wallet, plus you'll get first access to everything below.</p>
-            </div>
-            {isAuthenticated
-              ? <p className="founder-done"><CheckCircle size={20} aria-hidden="true" /> You're a founding member</p>
-              : <button className="btn btn-orange" onClick={() => setShowAuthModal(true)}>Claim my spot <ArrowRight size={18} aria-hidden="true" /></button>}
-          </div>
-
           <div className="section-head">
             <h2 className="section-title">What's coming to CuseRents</h2>
           </div>

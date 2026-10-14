@@ -247,7 +247,11 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 /* Hero */
-.hero { padding-top: clamp(20px, 2.5vw, 40px); }
+.hero { padding-top: clamp(20px, 2.5vw, 40px); padding-bottom: clamp(24px, 3vw, 40px); }
+.band-perk { padding: 0 0 clamp(24px, 3vw, 40px); }
+.band-perk .founder-card { margin-bottom: 0; padding: clamp(20px, 2vw, 28px) clamp(20px, 3vw, 40px); }
+.band-perk .founder-card h2 { font-size: clamp(1.3rem, 2vw, 1.75rem); margin-bottom: 4px; }
+.band-perk + .band { padding-top: clamp(24px, 3vw, 48px); }
 
 .hero-grid {
   display: grid;
@@ -318,7 +322,7 @@ button, input, select, textarea { font-family: inherit; }
 .hero-visual {
   position: relative;
   background: var(--sand);
-  padding: clamp(24px, 3vw, 48px);
+  padding: clamp(20px, 2vw, 32px);
 }
 
 .showcase-card {
@@ -326,7 +330,7 @@ button, input, select, textarea { font-family: inherit; }
   box-shadow: 0 20px 40px rgba(32, 33, 33, 0.12);
 }
 
-.showcase-card .product-media { aspect-ratio: 16 / 10; }
+.showcase-card .product-media { aspect-ratio: 16 / 10; max-height: clamp(200px, 28vh, 340px); width: 100%; }
 
 .showcase-body {
   display: flex;
