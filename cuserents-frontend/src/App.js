@@ -24,6 +24,7 @@ const DEMO_PHOTOS = {
   'instant pot duo': '/images/items/instant-pot.webp',
   'dewalt cordless drill': '/images/items/dewalt-drill-kit.webp',
   'kitchenaid stand mixer': '/images/items/kitchenaid-mixer.webp',
+  'camping gear': '/images/items/camping-gear.webp',
 };
 const photoFor = (item) => DEMO_PHOTOS[item?.title?.trim().toLowerCase()] || item?.photo_url;
 // Hero examples shown until there are 3+ real listings with photos, so a new deployment never looks empty.
