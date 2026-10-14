@@ -45,6 +45,14 @@ const ROADMAP = [
   { icon: Video, status: 'Planned', title: 'Video demos', text: 'Watch a short clip of how an item works before you book it.' },
   { icon: ShieldCheck, status: 'Planned', title: 'Verified students', text: 'A .edu verified badge on profiles for extra peace of mind.' },
 ];
+// Logo mark (same drawing as public/favicon.svg); the ring follows the text color, the dot stays orange
+const LogoMark = () => (
+  <svg className="logo-mark" viewBox="0 0 64 64" aria-hidden="true">
+    <path d="M47.3 19.1A20 20 0 1 0 47.3 44.9" fill="none" stroke="currentColor" strokeWidth="8" />
+    <polygon points="51.8,24.5 50.8,12.3 40,21.3" fill="currentColor" />
+    <circle cx="32" cy="32" r="7" fill="#F76900" />
+  </svg>
+);
 const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 const categories = [
@@ -605,7 +613,7 @@ function App() {
       <header className="site-header">
         <div className="container header-inner">
           <button className="wordmark" onClick={() => setCurrentView('home')} aria-label="CuseRents home">
-            cuse<span>rents</span>
+            <LogoMark />cuse<span>rents</span>
           </button>
           <nav id="main-nav" className={`header-nav ${menuOpen ? 'open' : ''}`} aria-label="Main">
             <button className={`nav-item ${currentView === 'browse' ? 'active' : ''}`} onClick={() => goToCategory('')}>Browse rentals</button>
@@ -640,7 +648,7 @@ function App() {
       <footer className="footer">
         <div className="container footer-cols">
           <div className="footer-brand">
-            <p className="wordmark wordmark-light">cuse<span>rents</span></p>
+            <p className="wordmark wordmark-light"><LogoMark />cuse<span>rents</span></p>
             <p>Rent from Syracuse neighbors. Save money, share more, waste less.</p>
           </div>
           <div>

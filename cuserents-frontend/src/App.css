@@ -86,6 +86,8 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 .wordmark span { color: var(--orange-text); }
+.wordmark { display: inline-flex; align-items: center; }
+.logo-mark { width: 1.15em; height: 1.15em; margin-right: 0.3em; flex-shrink: 0; }
 .wordmark-light { color: var(--white); }
 .wordmark-light span { color: var(--orange); }
 
