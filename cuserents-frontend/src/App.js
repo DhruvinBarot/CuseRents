@@ -62,7 +62,7 @@ function App() {
   const [slide, setSlide] = useState(0);
   const [slidesPaused, setSlidesPaused] = useState(false);
 
-  const { user, isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
     getStats().then(setStats).catch((err) => console.error('Error fetching stats:', err));
