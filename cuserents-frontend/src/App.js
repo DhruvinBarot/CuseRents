@@ -7,13 +7,34 @@ import PaymentForm from './components/PaymentForm';
 import PhotoInput from './components/PhotoInput';
 import ReviewForm from './components/ReviewForm';
 import LegalPage from './components/LegalPage';
-import { 
-  Home, Search, PlusCircle, User, MapPin, 
-  DollarSign, Package, Wrench, Camera, 
-  UtensilsCrossed, PartyPopper, Laptop, Book, LogOut,
-  ArrowLeft, Calendar
+import {
+  Search, PlusCircle, User, MapPin,
+  Package, Wrench, Camera,
+  UtensilsCrossed, PartyPopper, Laptop, Book,
+  ArrowLeft, Calendar, Lock, Star, Leaf, CheckCircle,
+  Plus, Menu, X, ArrowRight, ArrowUpRight,
+  Map as MapIcon, MessageSquare, Layers, Bell, Video, ShieldCheck, Gift, Pause, Play
 } from 'lucide-react';
 import './App.css';
+
+// shortcut: demo photos matched by item title, shipped in public/images/items. Delete once owners upload real photos.
+const DEMO_PHOTOS = {
+  'picnic kit': '/images/items/picnic-kit.webp',
+  'electric scooter': '/images/items/electric-scooter.webp',
+  'instant pot duo': '/images/items/instant-pot.webp',
+  'dewalt cordless drill': '/images/items/dewalt-drill-kit.webp',
+  'kitchenaid stand mixer': '/images/items/kitchenaid-mixer.webp',
+};
+const photoFor = (item) => DEMO_PHOTOS[item?.title?.trim().toLowerCase()] || item?.photo_url;
+const ROADMAP = [
+  { icon: MapIcon, status: 'Next up', title: 'Map search', text: 'See rentals on a live map and filter by walking distance from your dorm or apartment.' },
+  { icon: Layers, status: 'In progress', title: 'Bundles', text: 'Move-in kits, tailgate kits and camping kits rented together at one bundle price.' },
+  { icon: MessageSquare, status: 'Planned', title: 'In-app messaging', text: 'Agree on pickup times with owners without sharing your phone number.' },
+  { icon: Bell, status: 'Planned', title: 'Saved items & alerts', text: 'Save what you like and get notified when something you need is listed nearby.' },
+  { icon: Video, status: 'Planned', title: 'Video demos', text: 'Watch a short clip of how an item works before you book it.' },
+  { icon: ShieldCheck, status: 'Planned', title: 'Verified students', text: 'A .edu verified badge on profiles for extra peace of mind.' },
+];
+const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 const categories = [
   { id: 'tools', name: 'Tools', icon: Wrench, color: '#F76900' },
@@ -37,7 +58,10 @@ function App() {
   const [bookingData, setBookingData] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [stats, setStats] = useState(null);
-  
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [slide, setSlide] = useState(0);
+  const [slidesPaused, setSlidesPaused] = useState(false);
+
   const { user, isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
@@ -59,8 +83,10 @@ function App() {
     }
   }, [selectedCategory]);
 
+  useEffect(() => { window.scrollTo(0, 0); setMenuOpen(false); }, [currentView]);
+
   useEffect(() => {
-    if (currentView === 'browse') {
+    if (currentView === 'browse' || currentView === 'home') {
       fetchItems();
     }
   }, [currentView, fetchItems]);
@@ -74,6 +100,17 @@ function App() {
       return title.includes(query) || description.includes(query);
     });
   }, [items, searchQuery]);
+
+  // Hero slideshow: items with our demo photos first, else any item with a photo
+  const demoSlides = items.filter(i => DEMO_PHOTOS[i.title?.trim().toLowerCase()]);
+  const slides = demoSlides.length ? demoSlides : items.filter(i => i.photo_url).slice(0, 5);
+  const [slideHover, setSlideHover] = useState(false);
+
+  useEffect(() => {
+    if (currentView !== 'home' || slidesPaused || slideHover || slides.length < 2 || prefersReducedMotion()) return;
+    const timer = setInterval(() => setSlide(s => (s + 1) % slides.length), 4000);
+    return () => clearInterval(timer);
+  }, [currentView, slidesPaused, slideHover, slides.length]);
 
   const handleLogout = () => {
     logout();
@@ -90,94 +127,237 @@ function App() {
     setCurrentView('checkout');
   };
 
+  const goToCategory = (categoryId) => {
+    setSelectedCategory(categoryId);
+    setCurrentView('browse');
+  };
+
+  // Listing card shared by Home and Browse; the title button stretches to make the whole card clickable
+  const ItemCard = (item) => {
+    const category = categories.find(c => c.id === item.category);
+    const CategoryIcon = category?.icon || Package;
+    const rating = parseFloat(item.rating_avg);
+    return (
+      <article key={item.id} className="product-card">
+        <div className="product-media">
+          <CategoryIcon size={48} aria-hidden="true" />
+          {photoFor(item) && <img src={photoFor(item)} alt="" className="item-photo" loading="lazy" onError={(e) => { e.currentTarget.hidden = true; }} />}
+        </div>
+        <div className="product-body">
+          <p className="product-dept">{category?.name || 'Other'} · {item.distance_km ?? '0.5'} km away</p>
+          <h3 className="product-title">
+            <button className="card-link" onClick={() => handleViewDetails(item)}>{item.title}</button>
+          </h3>
+          <div className="product-foot">
+            <p className="product-price">
+              ${parseFloat(item.price_per_hour).toFixed(2)}<span>/hr</span>
+              {item.price_per_day && <span> · ${parseFloat(item.price_per_day).toFixed(0)}/day</span>}
+            </p>
+            {rating > 0
+              ? <span className="product-rating"><Star size={14} fill="currentColor" aria-hidden="true" />{rating.toFixed(1)}</span>
+              : <span className="product-new">New</span>}
+          </div>
+        </div>
+      </article>
+    );
+  };
+
   // ==================== HOME VIEW ====================
+  const featuredItems = items.slice(0, 8);
+  const activeSlide = slides.length ? slide % slides.length : 0;
+  const showcase = slides[activeSlide] || items[0];
+  const ShowcaseIcon = categories.find(c => c.id === showcase?.category)?.icon || Package;
+
   const HomeView = () => (
     <div className="home-view">
-      <div className="hero-section">
-        <h1 className="hero-title">🏙️ CuseRents</h1>
-        <p className="hero-subtitle">Rent from Syracuse neighbors</p>
-        <p className="hero-tagline">Save money. Save the planet. Build community.</p>
-        
-        <div className="hero-stats">
-          <div className="stat-item">
-            <div className="stat-number">{stats ? stats.items_available : '–'}</div>
-            <div className="stat-label">Items Available</div>
+      <section className="band hero">
+        <div className="container hero-grid">
+          <div className="hero-copy">
+            <p className="crumb">CuseRents <span aria-hidden="true">/</span> Syracuse, NY</p>
+            <h1 className="hero-title">Rent what you need from people near campus.</h1>
+            <p className="lede">Tools, cameras, party gear and more from Syracuse neighbors. Your card is only held, and charged after you return the item.</p>
+            <form className="hero-search" role="search" onSubmit={(e) => { e.preventDefault(); setCurrentView('browse'); }}>
+              <Search size={20} aria-hidden="true" />
+              <input
+                type="search"
+                aria-label="Search rentals"
+                placeholder="Try “drill” or “projector”"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                autoComplete="off"
+              />
+              <button type="submit" className="btn btn-dark">Search</button>
+            </form>
+            <div className="quick-chips">
+              <span>Popular:</span>
+              {categories.slice(0, 5).map(cat => (
+                <button key={cat.id} className="chip" onClick={() => goToCategory(cat.id)}>{cat.name}</button>
+              ))}
+            </div>
           </div>
-          <div className="stat-item">
-            <div className="stat-number">{stats ? `${stats.co2_saved_kg}kg` : '–'}</div>
-            <div className="stat-label">CO₂ Saved</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-number">{stats ? `$${Math.round(stats.rental_volume).toLocaleString()}` : '–'}</div>
-            <div className="stat-label">Rented So Far</div>
-          </div>
-        </div>
 
-        <button className="cta-button" onClick={() => setCurrentView('browse')}>
-          <Search size={20} />
-          Browse Items Near You
-        </button>
-      </div>
-
-      <div className="categories-section">
-        <h2 className="section-title">Browse by Category</h2>
-        <div className="category-grid">
-          {categories.map((cat) => {
-            const IconComponent = cat.icon;
-            return (
-              <div key={cat.id} className="category-card" onClick={() => {
-                setSelectedCategory(cat.id);
-                setCurrentView('browse');
-              }}>
-                <IconComponent size={40} color={cat.color} />
-                <span className="category-name">{cat.name}</span>
+          <div className="hero-visual">
+            {showcase && (
+              <div
+                className="showcase-card"
+                onMouseEnter={() => setSlideHover(true)}
+                onMouseLeave={() => setSlideHover(false)}
+                onFocus={() => setSlideHover(true)}
+                onBlur={() => setSlideHover(false)}
+              >
+                <div className="product-media showcase-media">
+                  <ShowcaseIcon size={64} aria-hidden="true" />
+                  {(slides.length ? slides : [showcase]).map((s, i) => photoFor(s) && (
+                    <img key={s.id} src={photoFor(s)} alt="" className={`item-photo ${i === activeSlide ? 'is-active' : ''}`} onError={(e) => { e.currentTarget.hidden = true; }} />
+                  ))}
+                </div>
+                <div className="showcase-body" key={showcase.id} aria-live={slidesPaused ? 'polite' : 'off'}>
+                  <div>
+                    <p className="product-dept">Popular near you</p>
+                    <h3>{showcase.title}</h3>
+                    <p className="product-price">${parseFloat(showcase.price_per_hour).toFixed(2)}<span>/hr</span></p>
+                  </div>
+                  <button className="btn btn-dark" onClick={() => handleViewDetails(showcase)}>View <ArrowRight size={18} aria-hidden="true" /></button>
+                </div>
+                {slides.length > 1 && (
+                  <div className="showcase-controls">
+                    {slides.map((s, i) => (
+                      <button key={s.id} className={`slide-dot ${i === activeSlide ? 'active' : ''}`} onClick={() => setSlide(i)} aria-label={`Show ${s.title}`} aria-current={i === activeSlide} />
+                    ))}
+                    <button className="slide-toggle" onClick={() => setSlidesPaused(p => !p)} aria-label={slidesPaused ? 'Play slideshow' : 'Pause slideshow'}>
+                      {slidesPaused ? <Play size={16} /> : <Pause size={16} />}
+                    </button>
+                  </div>
+                )}
               </div>
-            );
-          })}
+            )}
+            <p className="showcase-badge"><Lock size={16} aria-hidden="true" /> Card held, not charged</p>
+            <dl className="showcase-stats">
+              <div><dt>Items available</dt><dd>{stats ? stats.items_available : '–'}</dd></div>
+              <div><dt>CO₂ saved</dt><dd>{stats ? `${stats.co2_saved_kg} kg` : '–'}</dd></div>
+            </dl>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="how-it-works">
-        <h2 className="section-title">How It Works</h2>
-        <div className="steps-grid">
-          <div className="step-card">
-            <div className="step-number">1</div>
-            <h3>Search</h3>
-            <p>Find items near campus</p>
+      <section className="band band-line">
+        <ul className="container value-strip">
+          <li><Lock size={22} aria-hidden="true" /><div><strong>Held, not charged</strong><span>Pay after you return</span></div></li>
+          <li><Star size={22} aria-hidden="true" /><div><strong>Two-way reviews</strong><span>Renters and owners rate each other</span></div></li>
+          <li><MapPin size={22} aria-hidden="true" /><div><strong>Pickup near campus</strong><span>No shipping, no waiting</span></div></li>
+          <li><Leaf size={22} aria-hidden="true" /><div><strong>Greener than buying</strong><span>Share instead of buying new</span></div></li>
+        </ul>
+      </section>
+
+      <section className="band band-sand">
+        <div className="container">
+          <div className="section-head">
+            <h2 className="section-title">Browse by category</h2>
+            <button className="link-arrow" onClick={() => goToCategory('')}>All rentals <ArrowRight size={18} aria-hidden="true" /></button>
           </div>
-          <div className="step-card">
-            <div className="step-number">2</div>
-            <h3>Rent</h3>
-            <p>Book by hour or day</p>
-          </div>
-          <div className="step-card">
-            <div className="step-number">3</div>
-            <h3>Meet</h3>
-            <p>Pick up from neighbor</p>
-          </div>
-          <div className="step-card">
-            <div className="step-number">4</div>
-            <h3>Return</h3>
-            <p>Leave a review</p>
+          <div className="category-grid">
+            {categories.map((cat) => (
+              <button key={cat.id} className="category-card" onClick={() => goToCategory(cat.id)}>
+                <cat.icon size={28} aria-hidden="true" />
+                <span className="category-name">{cat.name}</span>
+                <ArrowUpRight className="category-arrow" size={20} aria-hidden="true" />
+              </button>
+            ))}
           </div>
         </div>
-      </div>
+      </section>
+
+      {featuredItems.length > 0 && (
+        <section className="band">
+          <div className="container">
+            <div className="section-head">
+              <h2 className="section-title">Popular near you</h2>
+              <button className="link-arrow" onClick={() => goToCategory('')}>See everything <ArrowRight size={18} aria-hidden="true" /></button>
+            </div>
+            <div className="items-grid">{featuredItems.map(ItemCard)}</div>
+          </div>
+        </section>
+      )}
+
+      <section className="band band-sand">
+        <div className="container split">
+          <h2 className="section-title">From students, for students</h2>
+          <p className="lede">Most of what we own sits unused most of the time. CuseRents lets the Syracuse community share it: renters save money, owners earn from things they already have, and fewer things get bought and thrown away.</p>
+        </div>
+        <ol className="container steps-grid">
+          <li className="step-card"><span className="step-number">01</span><h3>Search</h3><p>Find what you need near campus.</p></li>
+          <li className="step-card"><span className="step-number">02</span><h3>Book</h3><p>Pick a time. Your card is only held.</p></li>
+          <li className="step-card"><span className="step-number">03</span><h3>Pick up</h3><p>Show your booking code to the owner.</p></li>
+          <li className="step-card"><span className="step-number">04</span><h3>Return</h3><p>You're charged, the deposit is released, and you both leave a review.</p></li>
+        </ol>
+      </section>
+
+      <section className="band">
+        <div className="container">
+          <div className="founder-card">
+            <div>
+              <p className="founder-tag"><Gift size={16} aria-hidden="true" /> Founding member perk</p>
+              <h2>Join during the beta and get $5 on us.</h2>
+              <p>Create a free account now and we'll add $5 of rental credit to your wallet, plus you'll get first access to everything below.</p>
+            </div>
+            {isAuthenticated
+              ? <p className="founder-done"><CheckCircle size={20} aria-hidden="true" /> You're a founding member</p>
+              : <button className="btn btn-orange" onClick={() => setShowAuthModal(true)}>Claim my spot <ArrowRight size={18} aria-hidden="true" /></button>}
+          </div>
+
+          <div className="section-head">
+            <h2 className="section-title">What's coming to CuseRents</h2>
+          </div>
+          <ul className="roadmap-grid">
+            {ROADMAP.map(r => (
+              <li key={r.title} className="roadmap-card">
+                <div className="roadmap-top">
+                  <r.icon size={28} aria-hidden="true" />
+                  <span className={`roadmap-status ${r.status === 'Planned' ? '' : 'is-active'}`}>{r.status}</span>
+                </div>
+                <h3>{r.title}</h3>
+                <p>{r.text}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section className="band band-dark">
+        <div className="container cta-band">
+          <div>
+            <h2>Got stuff sitting around?</h2>
+            <p>List it in minutes and earn whenever a neighbor rents it. Payouts go to your bank through Stripe.</p>
+          </div>
+          <button className="btn btn-orange" onClick={() => setCurrentView('list')}><Plus size={18} aria-hidden="true" /> List an item</button>
+        </div>
+      </section>
     </div>
   );
 
   // ==================== BROWSE VIEW ====================
   const BrowseView = () => (
     <div className="browse-view">
-      <div className="search-bar">
-        <Search size={20} className="search-icon" />
-        <input
-          type="text"
-          placeholder="Search for drills, cameras, tools..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="search-input"
-          autoComplete="off"
-        />
+      <p className="crumb">
+        <button onClick={() => setCurrentView('home')}>CuseRents</button> <span aria-hidden="true">/</span> Browse
+        {selectedCategory && <> <span aria-hidden="true">/</span> {categories.find(c => c.id === selectedCategory)?.name}</>}
+      </p>
+      <h1 className="page-title">
+        {searchQuery ? `Results for “${searchQuery}”` : (categories.find(c => c.id === selectedCategory)?.name || 'All rentals')}
+      </h1>
+
+      <div className="browse-toolbar">
+        <div className="browse-search">
+          <Search size={20} aria-hidden="true" />
+          <input
+            type="search"
+            aria-label="Search rentals"
+            placeholder="Search rentals"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
       </div>
 
       <div className="category-filter">
@@ -198,40 +378,19 @@ function App() {
         </div>
       ) : (
         <>
-          <div className="results-header">
-            Found {filteredItems.length} items near Syracuse University
-          </div>
+          <p className="results-header">
+            {filteredItems.length} {filteredItems.length === 1 ? 'result' : 'results'} near Syracuse University
+          </p>
 
-          <div className="items-grid">
-            {filteredItems.map((item) => {
-              const CategoryIcon = categories.find(c => c.id === item.category)?.icon || Package;
-              return (
-                <div key={item.id} className="item-tile">
-                  <div className="item-icon-wrapper">
-                    {item.photo_url ? <img src={item.photo_url} alt={item.title} className="item-photo" /> : <CategoryIcon size={48} color="#F76900" />}
-                  </div>
-                  <div className="item-info">
-                    <h3 className="item-name">{item.title}</h3>
-                    <p className="item-desc">{item.description}</p>
-                    <div className="item-details">
-                      <div className="item-price">
-                        <DollarSign size={16} />
-                        <span className="price">{parseFloat(item.price_per_hour).toFixed(2)}</span>
-                        <span className="unit">/hr</span>
-                      </div>
-                      <div className="item-distance">
-                        <MapPin size={16} />
-                        <span>{item.distance_km || '0.5'}km</span>
-                      </div>
-                    </div>
-                    <button className="rent-button" onClick={() => handleViewDetails(item)}>
-                      View Details
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {filteredItems.length > 0 ? (
+            <div className="items-grid">{filteredItems.map(ItemCard)}</div>
+          ) : (
+            <div className="empty-results">
+              <h2>No rentals match that yet</h2>
+              <p>Try another department or search term, or be the first to list one.</p>
+              <button className="btn btn-dark" onClick={() => { setSearchQuery(''); setSelectedCategory(''); }}>Clear filters</button>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -320,7 +479,7 @@ function App() {
             </div>
 
             <div className="deposit-notice">
-              💳 Your card is only authorized now. When you return the item, the rental fee is charged
+              Your card is only authorized now. When you return the item, the rental fee is charged
               and the deposit hold is released (unless the owner reports damage).
             </div>
           </div>
@@ -346,7 +505,7 @@ function App() {
     return (
       <div className="confirmation-view">
         <div className="confirmation-card">
-          <div className="success-icon">✅</div>
+          <CheckCircle className="success-icon" size={72} aria-hidden="true" />
           <h1>Booking Confirmed!</h1>
           <p className="confirmation-message">
             Your card is authorized and your request has been sent to the owner.
@@ -402,11 +561,11 @@ function App() {
           <div className="next-steps-card">
             <h3>What's Next?</h3>
             <ul>
-              <li>✅ Booking code: <strong>{bookingCode}</strong> - saved to your account</li>
-              <li>📧 Check your email for confirmation</li>
-              <li>👤 The owner will contact you for pickup details</li>
-              <li>💳 You're charged only after return; the deposit hold is released then</li>
-              <li>⭐ Leave a review to earn bonus reward points!</li>
+              <li>Booking code: <strong>{bookingCode}</strong> - saved to your account</li>
+              <li>Check your email for confirmation</li>
+              <li>The owner will contact you for pickup details</li>
+              <li>You're charged only after return; the deposit hold is released then</li>
+              <li>Leave a review to earn bonus reward points!</li>
             </ul>
           </div>
 
@@ -426,38 +585,32 @@ function App() {
   // ==================== MAIN RENDER ====================
   return (
     <div className="App">
-      <nav className="navbar">
-        <div className="nav-container">
-          <div className="nav-brand" onClick={() => setCurrentView('home')}>🏙️ CuseRents</div>
-          <div className="nav-links">
-            <button className={`nav-link ${currentView === 'home' ? 'active' : ''}`} onClick={() => setCurrentView('home')}>
-              <Home size={20} /><span>Home</span>
-            </button>
-            <button className={`nav-link ${currentView === 'browse' ? 'active' : ''}`} onClick={() => setCurrentView('browse')}>
-              <Search size={20} /><span>Browse</span>
-            </button>
-            <button className={`nav-link ${currentView === 'list' ? 'active' : ''}`} onClick={() => setCurrentView('list')}>
-              <PlusCircle size={20} /><span>List Item</span>
-            </button>
-            <button className={`nav-link ${currentView === 'profile' ? 'active' : ''}`} onClick={() => setCurrentView('profile')}>
-              <User size={20} /><span>Profile</span>
-            </button>
-            {!isAuthenticated ? (
-              <button className="nav-link" onClick={() => setShowAuthModal(true)} style={{background: 'var(--orange)', color: 'white'}}>
-                <User size={20} /><span>Login</span>
-              </button>
-            ) : (
-              <>
-                <span className="nav-user">👤 {user?.username}</span>
-                <button className="nav-link" onClick={handleLogout}><LogOut size={20} /><span>Logout</span></button>
-              </>
+      <header className="site-header">
+        <div className="container header-inner">
+          <button className="wordmark" onClick={() => setCurrentView('home')} aria-label="CuseRents home">
+            cuse<span>rents</span>
+          </button>
+          <nav id="main-nav" className={`header-nav ${menuOpen ? 'open' : ''}`} aria-label="Main">
+            <button className={`nav-item ${currentView === 'browse' ? 'active' : ''}`} onClick={() => goToCategory('')}>Browse rentals</button>
+            <button className={`nav-item ${currentView === 'list' ? 'active' : ''}`} onClick={() => setCurrentView('list')}>Earn with your stuff</button>
+            {isAuthenticated && (
+              <button className={`nav-item ${currentView === 'profile' ? 'active' : ''}`} onClick={() => setCurrentView('profile')}>My account</button>
             )}
-          </div>
+            {isAuthenticated
+              ? <button className="nav-item nav-sand" onClick={handleLogout}>Sign out</button>
+              : <button className="nav-item nav-sand" onClick={() => { setMenuOpen(false); setShowAuthModal(true); }}>Sign in</button>}
+          </nav>
+          <button className="btn btn-dark header-cta" onClick={() => setCurrentView('list')} aria-label="List an item">
+            <Plus size={18} aria-hidden="true" /><span>List an item</span>
+          </button>
+          <button className="menu-toggle" onClick={() => setMenuOpen(o => !o)} aria-expanded={menuOpen} aria-controls="main-nav" aria-label="Menu">
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
-      </nav>
+      </header>
 
-      <main className="main-content">
-        {currentView === 'home' && <HomeView />}
+      <main className={`main-content ${currentView === 'home' ? 'is-home' : ''}`}>
+        {currentView === 'home' && HomeView()}
         {currentView === 'browse' && BrowseView()}
         {currentView === 'itemDetail' && <ItemDetailView selectedItem={selectedItem} setCurrentView={setCurrentView} setShowAuthModal={setShowAuthModal} handleProceedToCheckout={handleProceedToCheckout} />}
         {currentView === 'checkout' && <CheckoutView />}
@@ -468,12 +621,27 @@ function App() {
       </main>
 
       <footer className="footer">
-        <p>🍊 Built for Syracuse University • Sharing Economy for a Sustainable Future</p>
-        <p>
-          <button className="footer-link" onClick={() => setCurrentView('terms')}>Terms of Service</button>
-          {' • '}
-          <button className="footer-link" onClick={() => setCurrentView('privacy')}>Privacy Policy</button>
-        </p>
+        <div className="container footer-cols">
+          <div className="footer-brand">
+            <p className="wordmark wordmark-light">cuse<span>rents</span></p>
+            <p>Rent from Syracuse neighbors. Save money, share more, waste less.</p>
+          </div>
+          <div>
+            <h4>Rent</h4>
+            {categories.slice(0, 4).map(cat => <button key={cat.id} className="footer-link" onClick={() => goToCategory(cat.id)}>{cat.name}</button>)}
+          </div>
+          <div>
+            <h4>Earn</h4>
+            <button className="footer-link" onClick={() => setCurrentView('list')}>List an item</button>
+            <button className="footer-link" onClick={() => setCurrentView('profile')}>Set up payouts</button>
+          </div>
+          <div>
+            <h4>Legal</h4>
+            <button className="footer-link" onClick={() => setCurrentView('terms')}>Terms of Service</button>
+            <button className="footer-link" onClick={() => setCurrentView('privacy')}>Privacy Policy</button>
+          </div>
+        </div>
+        <p className="container footer-tag">Built for the Syracuse University community.</p>
       </footer>
 
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
@@ -538,7 +706,7 @@ function ItemDetailView({ selectedItem, setCurrentView, setShowAuthModal, handle
       <div className="detail-container">
         <div className="detail-header">
           <div className="detail-icon-wrapper">
-            {selectedItem.photo_url ? <img src={selectedItem.photo_url} alt={selectedItem.title} className="item-photo" /> : <CategoryIcon size={80} color="#F76900" />}
+            {photoFor(selectedItem) ? <img src={photoFor(selectedItem)} alt={selectedItem.title} className="item-photo" /> : <CategoryIcon size={80} color="#F76900" />}
           </div>
           <div className="detail-header-info">
             <h1>{selectedItem.title}</h1>
@@ -548,7 +716,7 @@ function ItemDetailView({ selectedItem, setCurrentView, setShowAuthModal, handle
               <span>{selectedItem.distance_km || '0.5'}km away • {selectedItem.address_text}</span>
             </div>
             <p style={{marginTop: '10px', color: 'var(--text-gray)'}}>
-              by {selectedItem.owner?.username || 'Unknown'} ⭐ {selectedItem.owner?.rating_avg?.toFixed(1) || '5.0'}
+              by {selectedItem.owner?.username || 'Unknown'} · ★ {selectedItem.owner?.rating_avg?.toFixed(1) || '5.0'}
             </p>
           </div>
         </div>
@@ -727,7 +895,7 @@ function ListItemView({ setCurrentView, setShowAuthModal, fetchItems }) {
   if (success) {
     return (
       <div className="success-message-page">
-        <div className="success-icon">✅</div>
+        <CheckCircle className="success-icon" size={72} aria-hidden="true" />
         <h2>Item Listed Successfully!</h2>
         <p>Your item is now available for rent.</p>
         <p className="redirect-message">Redirecting to browse page...</p>
@@ -797,7 +965,7 @@ function ListItemView({ setCurrentView, setShowAuthModal, fetchItems }) {
         </button>
       </form>
       <div className="info-box">
-        <h4>💡 Listing Tips</h4>
+        <h4>Listing Tips</h4>
         <ul>
           <li>Price competitively (check similar items)</li>
           <li>Write clear descriptions</li>
@@ -928,7 +1096,7 @@ function ProfileView({ setCurrentView, setShowAuthModal }) {
         <p className="profile-email">{user?.email}</p>
         <div className="profile-stats">
           <div className="profile-stat">
-            <div className="stat-value">{user?.rating_avg?.toFixed(1) || '5.0'} ⭐</div>
+            <div className="stat-value">{user?.rating_avg?.toFixed(1) || '5.0'} ★</div>
             <div className="stat-name">Rating</div>
           </div>
           <div className="profile-stat">
@@ -946,11 +1114,11 @@ function ProfileView({ setCurrentView, setShowAuthModal }) {
       </div>
 
       <div className="profile-section">
-        <h3>💸 Payouts</h3>
+        <h3>Payouts</h3>
         {!payouts ? (
           <p className="empty-state">Checking payout status...</p>
         ) : payouts.payouts_ready ? (
-          <p>✅ Payouts are set up. Rental fees go to your bank account through Stripe after each return.</p>
+          <p>Payouts are set up. Rental fees go to your bank account through Stripe after each return.</p>
         ) : (
           <>
             <p className="empty-state">
@@ -964,7 +1132,7 @@ function ProfileView({ setCurrentView, setShowAuthModal }) {
       </div>
 
       <div className="profile-section">
-        <h3>📬 Booking Requests for My Items ({bookingRequests.length})</h3>
+        <h3>Booking Requests for My Items ({bookingRequests.length})</h3>
         {loadingBookings ? (
           <div className="loading"><div className="spinner-small"></div><p>Loading...</p></div>
         ) : bookingRequests.length > 0 ? (
@@ -977,23 +1145,23 @@ function ProfileView({ setCurrentView, setShowAuthModal }) {
                 </div>
                 <h4>{booking.item?.title}</h4>
                 <p className="booking-renter">Requested by: {booking.renter?.username}</p>
-                <p className="booking-time">📅 {new Date(booking.start_time).toLocaleString()} → {new Date(booking.end_time).toLocaleString()}</p>
-                <p className="booking-price">💰 ${parseFloat(booking.total_price).toFixed(2)}</p>
+                <p className="booking-time">{new Date(booking.start_time).toLocaleString()} → {new Date(booking.end_time).toLocaleString()}</p>
+                <p className="booking-price">${parseFloat(booking.total_price).toFixed(2)}</p>
                 {booking.status === 'pending' && (
                   <div className="booking-actions">
-                    <button className="btn-accept" disabled={busyId === booking.id} onClick={() => handleAcceptBooking(booking.id)}>✅ Accept</button>
-                    <button className="btn-reject" disabled={busyId === booking.id} onClick={() => handleRejectBooking(booking.id)}>❌ Reject</button>
+                    <button className="btn-accept" disabled={busyId === booking.id} onClick={() => handleAcceptBooking(booking.id)}>Accept</button>
+                    <button className="btn-reject" disabled={busyId === booking.id} onClick={() => handleRejectBooking(booking.id)}>Reject</button>
                   </div>
                 )}
                 {booking.status === 'accepted' && (
                   <div className="booking-actions">
-                    <button className="btn-accept" disabled={busyId === booking.id} onClick={() => handleBookingStep(activateBooking, booking.id, 'Pickup confirmed, rental started')}>📦 Mark Picked Up</button>
+                    <button className="btn-accept" disabled={busyId === booking.id} onClick={() => handleBookingStep(activateBooking, booking.id, 'Pickup confirmed, rental started')}>Mark Picked Up</button>
                   </div>
                 )}
                 {booking.status === 'active' && (
                   <div className="booking-actions">
-                    <button className="btn-accept" disabled={busyId === booking.id} onClick={() => handleBookingStep(completeBooking, booking.id, 'Return confirmed, rental fee charged ✅')}>✅ Mark Returned</button>
-                    <button className="btn-reject" disabled={busyId === booking.id} onClick={() => window.confirm('Report damage? The renter will also be charged the full deposit.') && handleBookingStep((id) => completeBooking(id, true), booking.id, 'Damage reported, deposit charged')}>⚠️ Report Damage</button>
+                    <button className="btn-accept" disabled={busyId === booking.id} onClick={() => handleBookingStep(completeBooking, booking.id, 'Return confirmed, rental fee charged ✅')}>Mark Returned</button>
+                    <button className="btn-reject" disabled={busyId === booking.id} onClick={() => window.confirm('Report damage? The renter will also be charged the full deposit.') && handleBookingStep((id) => completeBooking(id, true), booking.id, 'Damage reported, deposit charged')}>Report Damage</button>
                   </div>
                 )}
                 {booking.status === 'completed' && !booking.reviewed_by_me && (
@@ -1008,7 +1176,7 @@ function ProfileView({ setCurrentView, setShowAuthModal }) {
       </div>
 
       <div className="profile-section">
-        <h3>📦 My Rental Requests ({myRentalRequests.length})</h3>
+        <h3>My Rental Requests ({myRentalRequests.length})</h3>
         {loadingBookings ? (
           <div className="loading"><div className="spinner-small"></div><p>Loading...</p></div>
         ) : myRentalRequests.length > 0 ? (
@@ -1021,11 +1189,11 @@ function ProfileView({ setCurrentView, setShowAuthModal }) {
                 </div>
                 <h4>{booking.item?.title}</h4>
                 <p className="booking-owner">Owner: {booking.owner?.username}</p>
-                <p className="booking-time">📅 {new Date(booking.start_time).toLocaleString()} → {new Date(booking.end_time).toLocaleString()}</p>
-                <p className="booking-price">💰 ${parseFloat(booking.total_price).toFixed(2)}</p>
+                <p className="booking-time">{new Date(booking.start_time).toLocaleString()} → {new Date(booking.end_time).toLocaleString()}</p>
+                <p className="booking-price">${parseFloat(booking.total_price).toFixed(2)}</p>
                 {booking.status === 'accepted' && (
                   <div className="booking-actions">
-                    <button className="btn-accept" disabled={busyId === booking.id} onClick={() => handleBookingStep(activateBooking, booking.id, 'Pickup confirmed, rental started')}>📦 Mark Picked Up</button>
+                    <button className="btn-accept" disabled={busyId === booking.id} onClick={() => handleBookingStep(activateBooking, booking.id, 'Pickup confirmed, rental started')}>Mark Picked Up</button>
                   </div>
                 )}
                 {['awaiting_payment', 'pending', 'accepted'].includes(booking.status) && (
@@ -1066,8 +1234,8 @@ function ProfileView({ setCurrentView, setShowAuthModal }) {
                     </div>
                   </div>
                   <div className="my-item-actions">
-                    <button className="btn-edit" onClick={() => setEditingItem(item)} disabled={isDeleting}>✏️ Edit</button>
-                    <button className="btn-delete" onClick={() => handleDelete(item.id)} disabled={isDeleting}>{isDeleting ? '⏳' : '🗑️'} Delete</button>
+                    <button className="btn-edit" onClick={() => setEditingItem(item)} disabled={isDeleting}>Edit</button>
+                    <button className="btn-delete" onClick={() => handleDelete(item.id)} disabled={isDeleting}>{isDeleting ? 'Deleting...' : 'Delete'}</button>
                   </div>
                 </div>
               );
