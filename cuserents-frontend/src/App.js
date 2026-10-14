@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { searchItems, createItem, getMyItems, getStats, activateBooking, completeBooking, acceptBooking, rejectBooking, startPayoutOnboarding, getPayoutStatus, cancelBooking, getItemReviews } from './services/api';
 import { useAuth } from './context/AuthContext';
 import AuthModal from './components/AuthModal';
@@ -44,13 +44,7 @@ function App() {
     getStats().then(setStats).catch((err) => console.error('Error fetching stats:', err));
   }, []);
 
-  useEffect(() => {
-    if (currentView === 'browse') {
-      fetchItems();
-    }
-  }, [currentView, selectedCategory]);
-
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
       const data = await searchItems(43.0481, -76.1474, {
@@ -63,7 +57,13 @@ function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    if (currentView === 'browse') {
+      fetchItems();
+    }
+  }, [currentView, fetchItems]);
 
   const filteredItems = useMemo(() => {
     if (!searchQuery) return items;
@@ -492,7 +492,7 @@ function ItemDetailView({ selectedItem, setCurrentView, setShowAuthModal, handle
   const [reviews, setReviews] = useState([]);
   useEffect(() => {
     if (selectedItem) getItemReviews(selectedItem.id).then(setReviews).catch(() => setReviews([]));
-  }, []);
+  }, [selectedItem]);
 
   if (!selectedItem) return null;
 
@@ -823,12 +823,12 @@ function ProfileView({ setCurrentView, setShowAuthModal }) {
   const [busyId, setBusyId] = useState(null);
 
   useEffect(() => {
-    if (isAuthenticated && currentView === 'profile') {
+    if (isAuthenticated) {
       fetchMyItems();
       fetchMyBookings();
       getPayoutStatus().then(setPayouts).catch((err) => console.error('Error fetching payout status:', err));
     }
-  }, [isAuthenticated, currentView]);
+  }, [isAuthenticated]);
 
   const fetchMyItems = async () => {
     setLoadingItems(true);
