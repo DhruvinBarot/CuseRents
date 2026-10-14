@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from .models import Item, ItemVideo, Bundle, BundleItem
+from .location import ApproximateLocationMixin, approximate_point
+import math
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -17,7 +19,7 @@ class ItemVideoSerializer(serializers.ModelSerializer):
         fields = ['id', 'video_url', 'thumbnail_url', 'duration_seconds', 'title', 'view_count']
         read_only_fields = ['view_count']
 
-class ItemListSerializer(serializers.ModelSerializer):
+class ItemListSerializer(ApproximateLocationMixin, serializers.ModelSerializer):
     """
     Serializer for item list view (map search results)
     Includes calculated distance field
@@ -43,7 +45,7 @@ class ItemListSerializer(serializers.ModelSerializer):
         """Check if item has video demo"""
         return obj.videos.exists()
 
-class ItemDetailSerializer(serializers.ModelSerializer):
+class ItemDetailSerializer(ApproximateLocationMixin, serializers.ModelSerializer):
     """
     Detailed serializer for single item view
     """
@@ -70,7 +72,11 @@ class ItemDetailSerializer(serializers.ModelSerializer):
         user_lat = self.context.get('user_lat')
         user_lng = self.context.get('user_lng')
         if user_lat and user_lng:
-            return obj.calculate_distance(user_lat, user_lng)
+            # Measured to the public (approximate) pin so the distance can't reveal the exact spot
+            lat, lng = approximate_point(obj)
+            lat1, lng1, lat2, lng2 = map(math.radians, (user_lat, user_lng, lat, lng))
+            a = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lng2 - lng1) / 2) ** 2
+            return round(6371 * 2 * math.asin(math.sqrt(a)), 2)
         return None
     
     def get_directions_url(self, obj):

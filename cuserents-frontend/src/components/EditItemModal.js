@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { updateItem } from '../services/api';
 import { X, Save } from 'lucide-react';
 import PhotoInput from './PhotoInput';
+const LocationPicker = lazy(() => import('./Maps').then(m => ({ default: m.LocationPicker })));
 
 const EditItemModal = ({ item, onClose, onSuccess, categories }) => {
   const [formData, setFormData] = useState({
@@ -176,7 +177,18 @@ const EditItemModal = ({ item, onClose, onSuccess, categories }) => {
           <PhotoInput value={formData.photo_url} onChange={(url) => setFormData((f) => ({ ...f, photo_url: url }))} />
 
           <div className="form-group">
-            <label>Location</label>
+            <label>Pickup spot on the map</label>
+            <Suspense fallback={<div className="leaflet-map picker-map" />}>
+              <LocationPicker
+                lat={parseFloat(formData.lat)}
+                lng={parseFloat(formData.lng)}
+                onChange={(lat, lng) => setFormData((f) => ({ ...f, lat, lng }))}
+              />
+            </Suspense>
+          </div>
+
+          <div className="form-group">
+            <label>Pickup address</label>
             <input 
               type="text" 
               name="address_text"

@@ -2,19 +2,30 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly
+from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 from .models import Item, ItemVideo, Bundle
+from .location import approximate_point, public_location
 from .serializers import (
     ItemListSerializer, ItemDetailSerializer, 
     ItemCreateUpdateSerializer, BundleSerializer
 )
 import math
 
+
+class ItemPagination(PageNumberPagination):
+    """Default 20 per page; the map asks for every pin in range with ?page_size=500"""
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 500
+
+
 class ItemViewSet(viewsets.ModelViewSet):
     """
     ViewSet for items with map search functionality and CRUD operations
     """
     permission_classes = [IsAuthenticatedOrReadOnly]
+    pagination_class = ItemPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'description', 'category']
     ordering_fields = ['created_at', 'price_per_hour', 'rating_avg']
@@ -105,10 +116,8 @@ class ItemViewSet(viewsets.ModelViewSet):
         distances = {}
         
         for item in queryset:
-            distance = self._calculate_distance(
-                user_lat, user_lng, 
-                item.lat, item.lng
-            )
+            # Distance to the public (approximate) pin, so repeated searches can't triangulate the exact spot
+            distance = self._calculate_distance(user_lat, user_lng, *approximate_point(item))
             
             if distance <= radius:
                 items_with_distance.append((item, distance))
@@ -124,14 +133,14 @@ class ItemViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(
                 page, 
                 many=True, 
-                context={'distances': distances}
+                context={**self.get_serializer_context(), 'distances': distances}
             )
             return self.get_paginated_response(serializer.data)
         
         serializer = self.get_serializer(
             sorted_items, 
             many=True, 
-            context={'distances': distances}
+            context={**self.get_serializer_context(), 'distances': distances}
         )
         
         return Response({
@@ -173,18 +182,22 @@ class ItemViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Only the owner gets the exact spot here; renters get it on their accepted booking
+        spot = {'lat': item.lat, 'lng': item.lng, 'address_text': item.address_text}
+        if request.user != item.owner:
+            spot = public_location(item)
         directions_url = (
             f"https://www.google.com/maps/dir/?api=1"
             f"&origin={user_lat},{user_lng}"
-            f"&destination={item.lat},{item.lng}"
+            f"&destination={spot['lat']},{spot['lng']}"
         )
         
         return Response({
             'directions_url': directions_url,
             'destination': {
-                'address': item.address_text,
-                'lat': item.lat,
-                'lng': item.lng
+                'address': spot['address_text'],
+                'lat': spot['lat'],
+                'lng': spot['lng']
             }
         })
     
@@ -259,10 +272,8 @@ class ItemViewSet(viewsets.ModelViewSet):
         distances = {}
         
         for item in queryset:
-            distance = self._calculate_distance(
-                user_lat, user_lng, 
-                item.lat, item.lng
-            )
+            # Distance to the public (approximate) pin, so repeated searches can't triangulate the exact spot
+            distance = self._calculate_distance(user_lat, user_lng, *approximate_point(item))
             
             if distance <= 1.0:  # 1km radius
                 nearby_items.append((item, distance))
@@ -275,7 +286,7 @@ class ItemViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(
             sorted_items, 
             many=True, 
-            context={'distances': distances}
+            context={**self.get_serializer_context(), 'distances': distances}
         )
         
         return Response(serializer.data)

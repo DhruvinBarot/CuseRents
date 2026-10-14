@@ -85,6 +85,7 @@ export const searchItems = async (lat, lng, filters = {}) => {
       ...(filters.min_price && { min_price: filters.min_price }),
       ...(filters.max_price && { max_price: filters.max_price }),
       ...(filters.available !== undefined && { available: filters.available }),
+      ...(filters.page_size && { page_size: filters.page_size }),
     };
     
     const response = await api.get('/items/items/search/', { params });

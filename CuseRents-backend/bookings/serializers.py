@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Booking
 from items.models import Item
+from items.location import public_location
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import timedelta
@@ -24,7 +25,20 @@ class BookingRenterSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'email', 'phone', 'rating_avg']
 
-class BookingListSerializer(serializers.ModelSerializer):
+class PickupRevealMixin:
+    """The renter sees the exact pickup spot only once the owner accepts; before that, the public approximate one."""
+    REVEAL_STATUSES = {'accepted', 'active', 'completed'}
+
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        request = self.context.get('request')
+        is_owner = request and obj.item and request.user == obj.item.owner
+        if data.get('item') and obj.status not in self.REVEAL_STATUSES and not is_owner:
+            data['item'].update(public_location(obj.item))
+        return data
+
+
+class BookingListSerializer(PickupRevealMixin, serializers.ModelSerializer):
     """Serializer for listing bookings"""
     item = BookingItemSerializer(read_only=True)
     renter = BookingRenterSerializer(read_only=True)
@@ -140,7 +154,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         
         return booking
 
-class BookingDetailSerializer(serializers.ModelSerializer):
+class BookingDetailSerializer(PickupRevealMixin, serializers.ModelSerializer):
     """Detailed serializer for single booking"""
     item = BookingItemSerializer(read_only=True)
     renter = BookingRenterSerializer(read_only=True)

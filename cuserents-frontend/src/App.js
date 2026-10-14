@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { searchItems, createItem, getMyItems, getStats, activateBooking, completeBooking, acceptBooking, rejectBooking, startPayoutOnboarding, getPayoutStatus, cancelBooking, getItemReviews } from './services/api';
 import { useAuth } from './context/AuthContext';
 import AuthModal from './components/AuthModal';
@@ -7,15 +7,20 @@ import PaymentForm from './components/PaymentForm';
 import PhotoInput from './components/PhotoInput';
 import ReviewForm from './components/ReviewForm';
 import LegalPage from './components/LegalPage';
+import { CAMPUS } from './places';
 import {
   Search, PlusCircle, User, MapPin,
   Package, Wrench, Camera,
   UtensilsCrossed, PartyPopper, Laptop, Book,
   ArrowLeft, Calendar, Lock, Star, Leaf, CheckCircle,
   Plus, Menu, X, ArrowRight, ArrowUpRight,
-  Map as MapIcon, MessageSquare, Layers, Bell, Video, ShieldCheck, Gift, Pause, Play
+  Map as MapIcon, List as ListIcon, LocateFixed, MessageSquare, Layers, Bell, Video, ShieldCheck, Gift, Pause, Play
 } from 'lucide-react';
 import './App.css';
+
+// Leaflet is ~60 KB gzipped: load it only on pages that show a map
+const MapView = lazy(() => import('./components/Maps').then(m => ({ default: m.MapView })));
+const LocationPicker = lazy(() => import('./components/Maps').then(m => ({ default: m.LocationPicker })));
 
 // shortcut: demo photos matched by item title, shipped in public/images/items. Delete once owners upload real photos.
 const DEMO_PHOTOS = {
@@ -53,6 +58,21 @@ const LogoMark = () => (
     <circle cx="32" cy="32" r="7" fill="#F76900" />
   </svg>
 );
+const PLACES = [
+  { label: 'Main Campus', ...CAMPUS },
+  { label: 'South Campus', lat: 43.0222, lng: -76.1218 },
+  { label: 'Downtown', lat: 43.0481, lng: -76.1474 },
+  { label: 'Westcott', lat: 43.0405, lng: -76.1180 },
+  { label: 'Armory Square', lat: 43.0473, lng: -76.1550 },
+];
+const WALKS = [{ label: '5 min walk', km: 0.4 }, { label: '10 min', km: 0.8 }, { label: '15 min', km: 1.2 }, { label: 'Any distance', km: null }];
+const ANY_RADIUS_KM = 20;
+// ~5 km/h walking pace
+const walkLabel = (km) => {
+  if (km == null) return '';
+  const minutes = Math.max(1, Math.round(km * 12));
+  return minutes <= 30 ? `${minutes} min walk` : `${km.toFixed(1)} km away`;
+};
 const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 const categories = [
@@ -80,6 +100,12 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [slide, setSlide] = useState(0);
   const [slidesPaused, setSlidesPaused] = useState(false);
+  const [center, setCenter] = useState(PLACES[0]);
+  const [radiusKm, setRadiusKm] = useState(null);
+  const [activeId, setActiveId] = useState(null);
+  const [mapOpen, setMapOpen] = useState(false); // phones: list or map
+  const [locating, setLocating] = useState(false);
+  const [locError, setLocError] = useState('');
 
   const { isAuthenticated, logout } = useAuth();
 
@@ -90,8 +116,9 @@ function App() {
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await searchItems(43.0481, -76.1474, {
-        radius: 20,
+      const data = await searchItems(center.lat, center.lng, {
+        radius: radiusKm || ANY_RADIUS_KM,
+        page_size: 500, // every pin in range, not just the first page
         ...(selectedCategory && { category: selectedCategory })
       });
       setItems(data.results || []);
@@ -100,7 +127,7 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, center, radiusKm]);
 
   useEffect(() => { window.scrollTo(0, 0); setMenuOpen(false); }, [currentView]);
 
@@ -146,6 +173,17 @@ function App() {
     setCurrentView('checkout');
   };
 
+  const locateMe = () => {
+    if (!navigator.geolocation) { setLocError("Your browser can't share location."); return; }
+    setLocating(true);
+    setLocError('');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setLocating(false); setCenter({ label: 'Your location', lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+      () => { setLocating(false); setLocError('Location is blocked, so we kept your current area.'); },
+      { timeout: 10000 }
+    );
+  };
+
   const goToCategory = (categoryId) => {
     setSelectedCategory(categoryId);
     setCurrentView('browse');
@@ -157,13 +195,18 @@ function App() {
     const CategoryIcon = category?.icon || Package;
     const rating = parseFloat(item.rating_avg);
     return (
-      <article key={item.id} className="product-card">
+      <article
+        key={item.id}
+        className={`product-card ${item.id === activeId ? 'is-active' : ''}`}
+        onMouseEnter={() => setActiveId(item.id)}
+        onMouseLeave={() => setActiveId(null)}
+      >
         <div className="product-media">
           <CategoryIcon size={48} aria-hidden="true" />
           {photoFor(item) && <img src={photoFor(item)} alt="" className="item-photo" loading="lazy" onError={(e) => { e.currentTarget.hidden = true; }} />}
         </div>
         <div className="product-body">
-          <p className="product-dept">{category?.name || 'Other'} · {item.distance_km ?? '0.5'} km away</p>
+          <p className="product-dept">{category?.name || 'Other'}{item.distance_km != null && ` · ${walkLabel(item.distance_km)}`}</p>
           <h3 className="product-title">
             <button className="card-link" onClick={() => handleViewDetails(item)}>{item.title}</button>
           </h3>
@@ -383,6 +426,26 @@ function App() {
             autoComplete="off"
           />
         </div>
+        <label className="near-select">
+          <span>Near</span>
+          <select
+            value={PLACES.some(p => p.label === center.label) ? center.label : ''}
+            onChange={(e) => setCenter(PLACES.find(p => p.label === e.target.value))}
+          >
+            {!PLACES.some(p => p.label === center.label) && <option value="">{center.label}</option>}
+            {PLACES.map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
+          </select>
+        </label>
+        <button className="chip locate-btn" onClick={locateMe} disabled={locating}>
+          <LocateFixed size={16} aria-hidden="true" /> {locating ? 'Locating...' : 'Use my location'}
+        </button>
+      </div>
+      {locError && <p className="picker-error" role="alert">{locError}</p>}
+
+      <div className="category-filter" aria-label="Walking distance">
+        {WALKS.map(w => (
+          <button key={w.label} className={`filter-chip ${radiusKm === w.km ? 'active' : ''}`} onClick={() => setRadiusKm(w.km)}>{w.label}</button>
+        ))}
       </div>
 
       <div className="category-filter">
@@ -396,28 +459,71 @@ function App() {
         ))}
       </div>
 
-      {loading ? (
-        <div className="loading">
-          <div className="spinner"></div>
-          <p>Finding items near you...</p>
-        </div>
-      ) : (
-        <>
-          <p className="results-header">
-            {filteredItems.length} {filteredItems.length === 1 ? 'result' : 'results'} near Syracuse University
-          </p>
-
-          {filteredItems.length > 0 ? (
-            <div className="items-grid">{filteredItems.map(ItemCard)}</div>
-          ) : (
-            <div className="empty-results">
-              <h2>No rentals match that yet</h2>
-              <p>Try another department or search term, or be the first to list one.</p>
-              <button className="btn btn-dark" onClick={() => { setSearchQuery(''); setSelectedCategory(''); }}>Clear filters</button>
+      <div className={`browse-split ${mapOpen ? 'show-map' : ''}`}>
+        <div className="browse-list">
+          {loading ? (
+            <div className="loading">
+              <div className="spinner"></div>
+              <p>Finding items near you...</p>
             </div>
+          ) : (
+            <>
+              <p className="results-header">
+                {filteredItems.length} {filteredItems.length === 1 ? 'result' : 'results'} near {center.label}
+              </p>
+
+              {filteredItems.length > 0 ? (
+                <div className="items-grid">{filteredItems.map(ItemCard)}</div>
+              ) : (
+                <div className="empty-results">
+                  <h2>No rentals match that yet</h2>
+                  <p>Try a longer walk, another category or search term, or be the first to list one.</p>
+                  <button className="btn btn-dark" onClick={() => { setSearchQuery(''); setSelectedCategory(''); setRadiusKm(null); }}>Clear filters</button>
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
+        </div>
+
+        <div className="browse-map">
+          <Suspense fallback={<div className="leaflet-map" />}>
+          <MapView
+            items={filteredItems}
+            center={center}
+            radiusKm={radiusKm}
+            activeId={activeId}
+            onSelect={(id) => {
+              setActiveId(id);
+              document.getElementById(`strip-${id}`)?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }}
+            onView={handleViewDetails}
+            photoFor={photoFor}
+            visible={mapOpen}
+          />
+          </Suspense>
+          {/* Phones: swipeable cards over the map */}
+          <div className="map-strip">
+            {filteredItems.map(item => (
+              <button
+                key={item.id}
+                id={`strip-${item.id}`}
+                className={`strip-card ${item.id === activeId ? 'is-active' : ''}`}
+                onClick={() => (item.id === activeId ? handleViewDetails(item) : setActiveId(item.id))}
+              >
+                {photoFor(item) && <img src={photoFor(item)} alt="" />}
+                <span>
+                  <strong>{item.title}</strong>
+                  <small>${parseFloat(item.price_per_hour).toFixed(2)}/hr{item.distance_km != null && ` · ${walkLabel(item.distance_km)}`}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <button className="btn btn-dark map-toggle" onClick={() => setMapOpen(o => !o)}>
+        {mapOpen ? <><ListIcon size={18} aria-hidden="true" /> List</> : <><MapIcon size={18} aria-hidden="true" /> Map</>}
+      </button>
     </div>
   );
 
@@ -738,7 +844,7 @@ function ItemDetailView({ selectedItem, setCurrentView, setShowAuthModal, handle
             <p className="detail-category">{selectedItem.category}</p>
             <div className="detail-location">
               <MapPin size={16} />
-              <span>{selectedItem.distance_km || '0.5'}km away • {selectedItem.address_text}</span>
+              <span>Pickup near {selectedItem.address_text}{selectedItem.distance_km != null && ` · ${walkLabel(selectedItem.distance_km)}`}. Exact spot shared after the owner accepts.</span>
             </div>
             <p style={{marginTop: '10px', color: 'var(--text-gray)'}}>
               by {selectedItem.owner?.username || 'Unknown'} · ★ {selectedItem.owner?.rating_avg?.toFixed(1) || '5.0'}
@@ -882,6 +988,12 @@ function ListItemView({ setCurrentView, setShowAuthModal, fetchItems }) {
       setSubmitting(false);
       return;
     }
+    if (formData.lat === '' || formData.lng === '') {
+      setError('Drop a pin on the map at your pickup spot');
+      setSubmitting(false);
+      window.scrollTo(0, 0);
+      return;
+    }
 
     try {
       const itemData = {
@@ -892,8 +1004,8 @@ function ListItemView({ setCurrentView, setShowAuthModal, fetchItems }) {
         price_per_day: formData.price_per_day ? parseFloat(formData.price_per_day) : null,
         deposit: parseFloat(formData.deposit) || 50,
         address_text: formData.address_text,
-        lat: parseFloat(formData.lat) || 43.0481,
-        lng: parseFloat(formData.lng) || -76.1474,
+        lat: formData.lat,
+        lng: formData.lng,
         photo_url: formData.photo_url,
         carbon_offset_kg: parseInt(formData.carbon_offset_kg) || 5,
         is_available: true
@@ -972,18 +1084,18 @@ function ListItemView({ setCurrentView, setShowAuthModal, fetchItems }) {
           <PhotoInput value={formData.photo_url} onChange={(url) => setFormData((f) => ({ ...f, photo_url: url }))} />
         </div>
         <div className="form-group">
-          <label>Location</label>
-          <input type="text" name="address_text" value={formData.address_text} onChange={handleChange} placeholder="e.g., 100 Winding Ridge Rd, Syracuse, NY" className="form-input" required />
+          <label htmlFor="address_text">Pickup address</label>
+          <input id="address_text" type="text" name="address_text" value={formData.address_text} onChange={handleChange} placeholder="e.g., 100 Winding Ridge Rd, Syracuse, NY" className="form-input" required />
         </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Latitude (optional)</label>
-            <input type="number" name="lat" value={formData.lat} onChange={handleChange} step="0.000001" placeholder="43.0481" className="form-input" />
-          </div>
-          <div className="form-group">
-            <label>Longitude (optional)</label>
-            <input type="number" name="lng" value={formData.lng} onChange={handleChange} step="0.000001" placeholder="-76.1474" className="form-input" />
-          </div>
+        <div className="form-group">
+          <label>Pickup spot on the map</label>
+          <Suspense fallback={<div className="leaflet-map picker-map" />}>
+            <LocationPicker
+              lat={formData.lat === '' ? NaN : formData.lat}
+              lng={formData.lng === '' ? NaN : formData.lng}
+              onChange={(lat, lng) => { setFormData((f) => ({ ...f, lat, lng })); setError(''); }}
+            />
+          </Suspense>
         </div>
         <button type="submit" className="submit-button" disabled={submitting}>
           {submitting ? <><div className="spinner-small"></div>Creating...</> : <><PlusCircle size={20} />List Item</>}
