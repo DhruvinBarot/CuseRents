@@ -5,6 +5,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
 
+from items.management.commands.seed_demo_items import DEMO_ITEMS
 from items.models import Item
 
 User = get_user_model()
@@ -17,17 +18,17 @@ class SeedDemoItemsTests(TestCase):
     def seed(self, **kwargs):
         call_command('seed_demo_items', owner='dhruv', photo_base='https://site.test/', stdout=StringIO(), **kwargs)
 
-    def test_creates_five_items_with_photos_for_owner(self):
+    def test_creates_all_demo_items_with_photos_for_owner(self):
         self.seed()
         items = Item.objects.filter(owner=self.owner)
-        self.assertEqual(items.count(), 5)
+        self.assertEqual(items.count(), len(DEMO_ITEMS))
         self.assertEqual(items.get(title='Instant Pot Duo').photo_url, 'https://site.test/images/items/instant-pot.webp')
 
     def test_rerun_does_not_duplicate_or_overwrite_edits(self):
         self.seed()
         Item.objects.filter(title='Picnic Kit').update(price_per_hour='4.00')
         self.seed()
-        self.assertEqual(Item.objects.filter(owner=self.owner).count(), 5)
+        self.assertEqual(Item.objects.filter(owner=self.owner).count(), len(DEMO_ITEMS))
         self.assertEqual(str(Item.objects.get(title='Picnic Kit').price_per_hour), '4.00')
 
     def test_fills_missing_photo_on_existing_listing(self):
@@ -36,6 +37,16 @@ class SeedDemoItemsTests(TestCase):
         self.seed()
         self.assertEqual(Item.objects.filter(owner=self.owner, title__iexact='picnic kit').count(), 1)
         self.assertTrue(Item.objects.get(title='picnic kit').photo_url.endswith('picnic-kit.webp'))
+
+    def test_every_demo_item_has_a_photo_file_and_sane_prices(self):
+        from pathlib import Path
+        photos = Path(__file__).resolve().parents[2] / 'cuserents-frontend' / 'public' / 'images' / 'items'
+        titles = [d['title'].lower() for d in DEMO_ITEMS]
+        self.assertEqual(len(titles), len(set(titles)), 'duplicate demo titles')
+        for d in DEMO_ITEMS:
+            self.assertTrue((photos / d['photo']).is_file(), d['photo'])
+            if d['price_per_day']:
+                self.assertGreater(float(d['price_per_day']), float(d['price_per_hour']), d['title'])
 
     def test_unknown_owner_fails_clearly(self):
         with self.assertRaisesMessage(CommandError, "No user named 'nobody'"):

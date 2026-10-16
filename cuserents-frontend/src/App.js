@@ -13,7 +13,7 @@ import {
   Package, Wrench, Camera,
   UtensilsCrossed, PartyPopper, Laptop, Book,
   ArrowLeft, Calendar, Lock, Star, Leaf, CheckCircle,
-  Plus, Menu, X, ArrowRight, ArrowUpRight,
+  Plus, Menu, X, ArrowRight, ArrowUpRight, Armchair,
   Map as MapIcon, List as ListIcon, LocateFixed, MessageSquare, Layers, Bell, Video, ShieldCheck, Gift, Pause, Play
 } from 'lucide-react';
 import './App.css';
@@ -83,6 +83,7 @@ const categories = [
   { id: 'party', name: 'Party', icon: PartyPopper, color: '#FF8C42' },
   { id: 'sports', name: 'Sports', icon: Package, color: '#D44500' },
   { id: 'books', name: 'Books', icon: Book, color: '#F76900' },
+  { id: 'furniture', name: 'Furniture', icon: Armchair, color: '#D44500' },
   { id: 'other', name: 'Other', icon: Package, color: '#FF8C42' },
 ];
 

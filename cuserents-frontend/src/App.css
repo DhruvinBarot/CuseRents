@@ -400,7 +400,7 @@ button, input, select, textarea { font-family: inherit; }
 /* Categories */
 .category-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 2px;
 }
 
@@ -2030,7 +2030,7 @@ button, input, select, textarea { font-family: inherit; }
 
 /* ========== RESPONSIVE ========== */
 @media (max-width: 1100px) {
-  .category-grid { grid-template-columns: repeat(4, 1fr); }
+  .category-grid { grid-template-columns: repeat(3, 1fr); }
   .value-strip { grid-template-columns: 1fr 1fr; }
   .value-strip li:nth-child(3) { padding-left: 0; border-left: none; }
   .value-strip li:nth-child(-n+2) { border-bottom: 1px solid var(--stone); }
@@ -2062,6 +2062,7 @@ button, input, select, textarea { font-family: inherit; }
 
   .hero-grid, .split { grid-template-columns: 1fr; }
   .category-grid { grid-template-columns: 1fr 1fr; }
+  .category-card:last-child:nth-child(odd) { grid-column: 1 / -1; } /* odd count: last tile fills the row */
   .steps-grid { grid-template-columns: 1fr 1fr; gap: 24px; }
   .cta-band { flex-direction: column; align-items: flex-start; }
   .founder-card { flex-direction: column; align-items: flex-start; }

@@ -8,7 +8,7 @@ python manage.py migrate --noinput
 if [ -n "$DJANGO_SUPERUSER_USERNAME" ]; then
   python manage.py createsuperuser --noinput || echo "Admin user already exists, skipping"
 fi
-# Optional: list the five demo items (with photos) under this username. Safe on every deploy; never overwrites edits.
+# Optional: list the demo items (with photos) under this username. Safe on every deploy; never overwrites edits.
 if [ -n "$DEMO_ITEMS_OWNER" ]; then
   python manage.py seed_demo_items --owner "$DEMO_ITEMS_OWNER" || echo "Demo items skipped (see message above)"
 fi
